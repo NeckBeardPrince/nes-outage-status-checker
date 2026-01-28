@@ -128,10 +128,29 @@
             background: #16213e;
             position: relative;
             transition: all 0.2s;
+            cursor: grab;
+        }
+
+        .monitor:active {
+            cursor: grabbing;
+        }
+
+        .monitor.dragging {
+            opacity: 0.5;
+            cursor: grabbing;
+        }
+
+        .monitor.drag-over {
+            border-color: #667eea;
+            background: #1a1a3e;
         }
 
         .monitor.priority {
             border-color: #2ed573;
+        }
+
+        .monitor.priority.drag-over {
+            border-color: #667eea;
         }
 
         .monitor-header {
@@ -657,7 +676,10 @@
 
         function createMonitorHTML(id) {
             return `
-                <div class="monitor" id="monitor-${id}" data-id="${id}">
+                <div class="monitor" id="monitor-${id}" data-id="${id}" draggable="true"
+                     ondragstart="handleDragStart(event)" ondragend="handleDragEnd(event)"
+                     ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)"
+                     ondrop="handleDrop(event)">
                     <button class="remove-btn" onclick="removeMonitor(${id})">×</button>
                     <input type="text" class="monitor-label" id="label-${id}" placeholder="Custom label (e.g., Home, Office, Mom's house)" onchange="saveToStorage(); updateURL();">
                     <div class="monitor-header">
@@ -781,6 +803,61 @@
 
         function handleKeypress(e, id) {
             if (e.key === 'Enter') checkSingleMonitor(id);
+        }
+
+        // Drag and drop functionality
+        let draggedElement = null;
+
+        function handleDragStart(e) {
+            draggedElement = e.target.closest('.monitor');
+            draggedElement.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', draggedElement.dataset.id);
+        }
+
+        function handleDragEnd(e) {
+            if (draggedElement) {
+                draggedElement.classList.remove('dragging');
+            }
+            document.querySelectorAll('.monitor').forEach(el => {
+                el.classList.remove('drag-over');
+            });
+            draggedElement = null;
+            saveToStorage();
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            const target = e.target.closest('.monitor');
+            if (target && target !== draggedElement) {
+                target.classList.add('drag-over');
+            }
+        }
+
+        function handleDragLeave(e) {
+            const target = e.target.closest('.monitor');
+            if (target) {
+                target.classList.remove('drag-over');
+            }
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            const target = e.target.closest('.monitor');
+            if (target && target !== draggedElement) {
+                target.classList.remove('drag-over');
+                const container = document.getElementById('monitors');
+                const allMonitors = Array.from(container.querySelectorAll('.monitor'));
+                const draggedIndex = allMonitors.indexOf(draggedElement);
+                const targetIndex = allMonitors.indexOf(target);
+
+                if (draggedIndex < targetIndex) {
+                    target.parentNode.insertBefore(draggedElement, target.nextSibling);
+                } else {
+                    target.parentNode.insertBefore(draggedElement, target);
+                }
+            }
         }
 
         document.getElementById('refreshInterval').addEventListener('change', () => {
