@@ -45,8 +45,10 @@ Example:
 ## Finding Your Event ID
 
 1. Go to [nespower.com/outages](https://www.nespower.com/outages/)
-2. Click on your outage marker on the map
-3. The event ID is shown in the outage details popup, or you can find it in the network requests to the API
+2. Open your browsers Dev Tools
+3. Click on your outage marker on the map
+4. Get event id.
+<img width="3840" height="748" alt="CleanShot 2026-01-28 at 13 13 38@2x" src="https://github.com/user-attachments/assets/c5b63036-8c27-4274-bf98-ae84bedc001b" />
 
 ## API
 
