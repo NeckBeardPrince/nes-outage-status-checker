@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NES Outage Status Checker</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
     <style>
         * {
             box-sizing: border-box;
@@ -28,6 +29,8 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 24px;
+            flex-wrap: wrap;
+            gap: 12px;
         }
 
         h1 {
@@ -39,14 +42,71 @@
             margin: 0;
         }
 
-        .about-link {
-            color: #667eea;
-            text-decoration: none;
-            font-size: 0.95rem;
+        .header-links {
+            display: flex;
+            gap: 16px;
+            align-items: center;
         }
 
-        .about-link:hover {
+        .header-link {
+            color: #667eea;
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+
+        .header-link:hover {
             text-decoration: underline;
+        }
+
+        .summary-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: #16213e;
+            border: 1px solid #3d3d5c;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .summary-stats {
+            display: flex;
+            gap: 20px;
+            font-size: 0.9rem;
+        }
+
+        .summary-stat {
+            color: #a0a0a0;
+        }
+
+        .summary-stat strong {
+            color: #e0e0e0;
+        }
+
+        .summary-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .icon-btn {
+            padding: 6px 12px;
+            background: #3d3d5c;
+            border: none;
+            border-radius: 6px;
+            color: #e0e0e0;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.2s;
+        }
+
+        .icon-btn:hover {
+            background: #4d4d6c;
+        }
+
+        .icon-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
 
         .monitors {
@@ -61,6 +121,16 @@
             padding: 20px;
             background: #16213e;
             position: relative;
+            transition: all 0.2s;
+        }
+
+        .monitor.priority {
+            border-color: #2ed573;
+            order: -1;
+        }
+
+        .monitor.unassigned {
+            order: -2;
         }
 
         .monitor-header {
@@ -227,6 +297,60 @@
             font-size: 0.85rem;
         }
 
+        .duration {
+            color: #ffa502;
+            font-size: 0.85rem;
+            margin-top: 8px;
+        }
+
+        .monitor-actions {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .monitor-action-btn {
+            padding: 4px 10px;
+            background: #3d3d5c;
+            border: none;
+            border-radius: 4px;
+            color: #a0a0a0;
+            cursor: pointer;
+            font-size: 0.75rem;
+            transition: all 0.2s;
+        }
+
+        .monitor-action-btn:hover {
+            background: #4d4d6c;
+            color: #e0e0e0;
+        }
+
+        .history {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #3d3d5c;
+            font-size: 0.8rem;
+        }
+
+        .history-title {
+            color: #888;
+            margin-bottom: 6px;
+        }
+
+        .history-item {
+            color: #666;
+            padding: 2px 0;
+        }
+
+        .history-item.assigned {
+            color: #2ed573;
+        }
+
+        .history-item.unassigned {
+            color: #ff6b6b;
+        }
+
         .instructions {
             text-align: center;
             color: #666;
@@ -253,7 +377,7 @@
         .options {
             display: flex;
             align-items: center;
-            gap: 16px;
+            gap: 12px;
             flex-wrap: wrap;
         }
 
@@ -281,19 +405,22 @@
             border-color: #667eea;
         }
 
-        .notify-btn {
+        .toggle-btn {
             padding: 4px 10px;
             font-size: 0.8rem;
             background: #3d3d5c;
+            border: none;
             border-radius: 4px;
+            color: #e0e0e0;
+            cursor: pointer;
         }
 
-        .notify-btn.enabled {
+        .toggle-btn.enabled {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
 
         .hidden {
-            display: none;
+            display: none !important;
         }
 
         .result {
@@ -302,6 +429,20 @@
 
         .result.visible {
             display: block;
+        }
+
+        .details-content {
+            transition: all 0.2s;
+        }
+
+        .compact .details-content {
+            display: none;
+        }
+
+        .compact .status {
+            margin-top: 0;
+            padding-top: 0;
+            border-top: none;
         }
 
         .monitor-label {
@@ -346,14 +487,48 @@
             margin-top: 8px;
             color: #444;
         }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #2ed573;
+            color: #1a1a2e;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+
+        .toast.show {
+            opacity: 1;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
             <h1>NES Outage Status Checker</h1>
-            <a href="https://github.com/NeckBeardPrince/nes-outage-status-checker/blob/main/README.md#finding-your-event-id" target="_blank" class="about-link">How to find Event ID</a>
+            <div class="header-links">
+                <a href="https://github.com/NeckBeardPrince/nes-outage-status-checker/blob/main/README.md#finding-your-event-id" target="_blank" class="header-link">How to find Event ID</a>
+            </div>
         </header>
+
+        <div class="summary-bar">
+            <div class="summary-stats">
+                <span class="summary-stat">Monitors: <strong id="monitorCount">0</strong></span>
+                <span class="summary-stat">Total Affected: <strong id="totalAffected">0</strong></span>
+            </div>
+            <div class="summary-actions">
+                <button class="icon-btn" onclick="copyURL()" title="Copy shareable URL">Copy URL</button>
+                <button class="icon-btn" id="compactBtn" onclick="toggleCompactView()" title="Toggle compact view">Compact</button>
+                <button class="icon-btn" id="sortBtn" onclick="toggleSort()" title="Sort by status">Sort</button>
+            </div>
+        </div>
 
         <div class="monitors" id="monitors"></div>
 
@@ -374,8 +549,11 @@
                         <option value="3600000">60 min</option>
                     </select>
                 </div>
-                <button id="notifyBtn" class="notify-btn" onclick="toggleNotifications()">
+                <button id="notifyBtn" class="toggle-btn" onclick="toggleNotifications()">
                     Notifications: Off
+                </button>
+                <button id="soundBtn" class="toggle-btn" onclick="toggleSound()">
+                    Sound: Off
                 </button>
             </div>
         </div>
@@ -386,18 +564,49 @@
         </footer>
     </div>
 
+    <div class="toast" id="toast">URL copied to clipboard!</div>
+
     <script>
         const API_URL = 'https://utilisocial.io/datacapable/v2/p/NES/map/events';
         const STORAGE_KEY = 'nes-outage-monitors';
+        const SETTINGS_KEY = 'nes-outage-settings';
         let refreshTimer = null;
         let notificationsEnabled = false;
+        let soundEnabled = false;
+        let compactView = false;
+        let sortByStatus = false;
         let monitorId = 0;
         let monitors = {};
+
+        // Audio context for notification sound
+        let audioContext = null;
+
+        function playNotificationSound() {
+            if (!soundEnabled) return;
+            try {
+                if (!audioContext) {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                oscillator.frequency.value = 880;
+                oscillator.type = 'sine';
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.5);
+            } catch (e) {
+                console.log('Audio not supported');
+            }
+        }
 
         function saveToStorage() {
             const data = Object.entries(monitors).map(([id, m]) => ({
                 eventId: m.eventId,
-                label: document.getElementById(`label-${id}`)?.value || ''
+                label: document.getElementById(`label-${id}`)?.value || '',
+                history: m.history || []
             })).filter(m => m.eventId || m.label);
             localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
         }
@@ -411,9 +620,40 @@
             }
         }
 
+        function saveSettings() {
+            localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+                compactView,
+                sortByStatus,
+                soundEnabled
+            }));
+        }
+
+        function loadSettings() {
+            try {
+                const data = localStorage.getItem(SETTINGS_KEY);
+                if (data) {
+                    const settings = JSON.parse(data);
+                    compactView = settings.compactView || false;
+                    sortByStatus = settings.sortByStatus || false;
+                    soundEnabled = settings.soundEnabled || false;
+                    updateSettingsUI();
+                }
+            } catch {}
+        }
+
+        function updateSettingsUI() {
+            document.getElementById('compactBtn').classList.toggle('active', compactView);
+            document.getElementById('sortBtn').classList.toggle('active', sortByStatus);
+            document.getElementById('soundBtn').textContent = `Sound: ${soundEnabled ? 'On' : 'Off'}`;
+            document.getElementById('soundBtn').classList.toggle('enabled', soundEnabled);
+            if (compactView) {
+                document.querySelectorAll('.result').forEach(el => el.classList.add('compact'));
+            }
+        }
+
         function createMonitorHTML(id) {
             return `
-                <div class="monitor" id="monitor-${id}">
+                <div class="monitor" id="monitor-${id}" data-id="${id}">
                     <button class="remove-btn" onclick="removeMonitor(${id})">×</button>
                     <input type="text" class="monitor-label" id="label-${id}" placeholder="Custom label (e.g., Home, Office, Mom's house)" onchange="saveToStorage(); updateURL();">
                     <div class="monitor-header">
@@ -427,38 +667,49 @@
                         <span class="spinner"></span> Fetching...
                     </div>
                     <div class="error hidden" id="error-${id}"></div>
-                    <div class="result" id="result-${id}">
-                        <div class="field">
-                            <span class="label">Event ID:</span>
-                            <span class="value" id="resEventId-${id}"></span>
-                        </div>
-                        <div class="field">
-                            <span class="label">Identifier:</span>
-                            <span class="value" id="resIdentifier-${id}"></span>
-                        </div>
-                        <div class="field">
-                            <span class="label">Title:</span>
-                            <span class="value" id="resTitle-${id}"></span>
-                        </div>
-                        <div class="field">
-                            <span class="label">Affected:</span>
-                            <span class="value" id="resAffected-${id}"></span>
-                        </div>
-                        <div class="field hidden" id="causeField-${id}">
-                            <span class="label">Cause:</span>
-                            <span class="value" id="resCause-${id}"></span>
-                        </div>
-                        <div class="field">
-                            <span class="label">Started:</span>
-                            <span class="value" id="resStarted-${id}"></span>
-                        </div>
-                        <div class="field">
-                            <span class="label">Last Updated:</span>
-                            <span class="value" id="resUpdated-${id}"></span>
+                    <div class="result ${compactView ? 'compact' : ''}" id="result-${id}">
+                        <div class="details-content">
+                            <div class="field">
+                                <span class="label">Event ID:</span>
+                                <span class="value" id="resEventId-${id}"></span>
+                            </div>
+                            <div class="field">
+                                <span class="label">Identifier:</span>
+                                <span class="value" id="resIdentifier-${id}"></span>
+                            </div>
+                            <div class="field">
+                                <span class="label">Title:</span>
+                                <span class="value" id="resTitle-${id}"></span>
+                            </div>
+                            <div class="field">
+                                <span class="label">Affected:</span>
+                                <span class="value" id="resAffected-${id}"></span>
+                            </div>
+                            <div class="field hidden" id="causeField-${id}">
+                                <span class="label">Cause:</span>
+                                <span class="value" id="resCause-${id}"></span>
+                            </div>
+                            <div class="field">
+                                <span class="label">Started:</span>
+                                <span class="value" id="resStarted-${id}"></span>
+                            </div>
+                            <div class="field">
+                                <span class="label">Last Updated:</span>
+                                <span class="value" id="resUpdated-${id}"></span>
+                            </div>
                         </div>
                         <div class="status">
                             <div id="statusBadge-${id}" class="status-badge"></div>
                             <div id="statusMessage-${id}" class="status-message"></div>
+                            <div id="duration-${id}" class="duration"></div>
+                        </div>
+                        <div class="monitor-actions">
+                            <button class="monitor-action-btn" onclick="openMap(${id})">View on Map</button>
+                            <button class="monitor-action-btn" onclick="toggleHistory(${id})">History</button>
+                        </div>
+                        <div class="history hidden" id="history-${id}">
+                            <div class="history-title">Status History</div>
+                            <div id="historyItems-${id}"></div>
                         </div>
                     </div>
                 </div>
@@ -467,11 +718,11 @@
 
         const MAX_MONITORS = 4;
 
-        function addMonitor(eventId = null, label = '') {
+        function addMonitor(eventId = null, label = '', history = []) {
             if (Object.keys(monitors).length >= MAX_MONITORS) return null;
 
             const id = monitorId++;
-            monitors[id] = { eventId: null, previousStatus: null };
+            monitors[id] = { eventId: null, previousStatus: null, history: history || [] };
 
             const container = document.getElementById('monitors');
             container.insertAdjacentHTML('beforeend', createMonitorHTML(id));
@@ -487,6 +738,7 @@
 
             updateRemoveButtons();
             updateAddButton();
+            updateSummary();
             return id;
         }
 
@@ -508,6 +760,7 @@
                 updateRemoveButtons();
                 updateAddButton();
                 saveToStorage();
+                updateSummary();
             }
         }
 
@@ -587,6 +840,54 @@
             btn.classList.add('enabled');
         }
 
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            const btn = document.getElementById('soundBtn');
+            btn.textContent = `Sound: ${soundEnabled ? 'On' : 'Off'}`;
+            btn.classList.toggle('enabled', soundEnabled);
+            saveSettings();
+            // Play test sound when enabling
+            if (soundEnabled) {
+                playNotificationSound();
+            }
+        }
+
+        function toggleCompactView() {
+            compactView = !compactView;
+            document.getElementById('compactBtn').classList.toggle('active', compactView);
+            document.querySelectorAll('.result').forEach(el => {
+                el.classList.toggle('compact', compactView);
+            });
+            saveSettings();
+        }
+
+        function toggleSort() {
+            sortByStatus = !sortByStatus;
+            document.getElementById('sortBtn').classList.toggle('active', sortByStatus);
+            sortMonitors();
+            saveSettings();
+        }
+
+        function sortMonitors() {
+            const container = document.getElementById('monitors');
+            const monitorEls = Array.from(container.querySelectorAll('.monitor'));
+
+            if (sortByStatus) {
+                monitorEls.sort((a, b) => {
+                    const aId = a.dataset.id;
+                    const bId = b.dataset.id;
+                    const aStatus = monitors[aId]?.previousStatus || '';
+                    const bStatus = monitors[bId]?.previousStatus || '';
+                    // Unassigned first, then others
+                    if (aStatus === 'Unassigned' && bStatus !== 'Unassigned') return -1;
+                    if (bStatus === 'Unassigned' && aStatus !== 'Unassigned') return 1;
+                    return 0;
+                });
+            }
+
+            monitorEls.forEach(el => container.appendChild(el));
+        }
+
         function sendNotification(title, body) {
             if (notificationsEnabled && Notification.permission === 'granted') {
                 new Notification(title, {
@@ -594,6 +895,7 @@
                     icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">⚡</text></svg>'
                 });
             }
+            playNotificationSound();
         }
 
         function updateURL() {
@@ -615,6 +917,70 @@
                 url.searchParams.delete('monitors');
             }
             window.history.replaceState({}, '', url);
+        }
+
+        function copyURL() {
+            navigator.clipboard.writeText(window.location.href).then(() => {
+                const toast = document.getElementById('toast');
+                toast.classList.add('show');
+                setTimeout(() => toast.classList.remove('show'), 2000);
+            });
+        }
+
+        function openMap(id) {
+            const eventId = monitors[id]?.eventId;
+            if (eventId) {
+                window.open(`https://www.nespower.com/outages/`, '_blank');
+            }
+        }
+
+        function toggleHistory(id) {
+            const historyEl = document.getElementById(`history-${id}`);
+            historyEl.classList.toggle('hidden');
+        }
+
+        function updateHistory(id, status) {
+            const monitor = monitors[id];
+            if (!monitor.history) monitor.history = [];
+
+            const now = new Date();
+            monitor.history.unshift({
+                status: status,
+                time: now.toISOString()
+            });
+
+            // Keep only last 10 entries
+            monitor.history = monitor.history.slice(0, 10);
+
+            // Update display
+            const historyItems = document.getElementById(`historyItems-${id}`);
+            if (historyItems) {
+                historyItems.innerHTML = monitor.history.map(h => {
+                    const time = new Date(h.time).toLocaleTimeString();
+                    const cls = h.status === 'Unassigned' ? 'unassigned' : 'assigned';
+                    return `<div class="history-item ${cls}">${time} - ${h.status}</div>`;
+                }).join('');
+            }
+        }
+
+        function formatDuration(startTime) {
+            const now = Date.now();
+            const diff = now - startTime;
+            const hours = Math.floor(diff / (1000 * 60 * 60));
+            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+            if (hours > 0) {
+                return `Ongoing for ${hours}h ${minutes}m`;
+            }
+            return `Ongoing for ${minutes}m`;
+        }
+
+        function updateSummary() {
+            const activeMonitors = Object.values(monitors).filter(m => m.eventId !== null);
+            document.getElementById('monitorCount').textContent = activeMonitors.length;
+
+            const totalAffected = activeMonitors.reduce((sum, m) => sum + (m.numPeople || 0), 0);
+            document.getElementById('totalAffected').textContent = totalAffected.toLocaleString();
         }
 
         async function checkSingleMonitor(id) {
@@ -675,6 +1041,7 @@
                 });
 
                 document.getElementById('lastChecked').textContent = `Last checked: ${new Date().toLocaleTimeString()}`;
+                if (sortByStatus) sortMonitors();
             } catch (err) {
                 activeMonitors.forEach(([id]) => showError(id, err.message));
             }
@@ -699,12 +1066,18 @@
             document.getElementById(`instructions-${id}`).classList.add('hidden');
             document.getElementById(`loading-${id}`).classList.add('hidden');
             document.getElementById(`error-${id}`).classList.add('hidden');
-            document.getElementById(`result-${id}`).classList.add('visible');
+            const resultEl = document.getElementById(`result-${id}`);
+            resultEl.classList.add('visible');
+            if (compactView) resultEl.classList.add('compact');
 
             document.getElementById(`resEventId-${id}`).textContent = event.id;
             document.getElementById(`resIdentifier-${id}`).textContent = event.identifier;
             document.getElementById(`resTitle-${id}`).textContent = event.title;
             document.getElementById(`resAffected-${id}`).textContent = `${event.numPeople} people`;
+
+            // Store numPeople for summary
+            monitors[id].numPeople = event.numPeople;
+            updateSummary();
 
             const causeField = document.getElementById(`causeField-${id}`);
             if (event.cause) {
@@ -717,17 +1090,25 @@
             document.getElementById(`resStarted-${id}`).textContent = formatDate(event.startTime);
             document.getElementById(`resUpdated-${id}`).textContent = formatDate(event.lastUpdatedTime);
 
+            // Duration
+            document.getElementById(`duration-${id}`).textContent = formatDuration(event.startTime);
+
             const badge = document.getElementById(`statusBadge-${id}`);
             const message = document.getElementById(`statusMessage-${id}`);
+            const monitorEl = document.getElementById(`monitor-${id}`);
+
+            monitorEl.classList.remove('unassigned', 'priority');
 
             if (event.status === 'Unassigned') {
                 badge.className = 'status-badge status-unassigned';
                 badge.textContent = 'STATUS: UNASSIGNED';
                 message.textContent = 'No technician assigned yet';
+                monitorEl.classList.add('unassigned');
             } else {
                 badge.className = 'status-badge status-assigned';
                 badge.textContent = `STATUS: ${event.status.toUpperCase()}`;
                 message.textContent = 'A technician has been assigned!';
+                monitorEl.classList.add('priority');
             }
 
             // Check for status change and notify
@@ -735,15 +1116,22 @@
             const label = document.getElementById(`label-${id}`)?.value;
             const displayName = label || `Event ${event.id}`;
             if (monitor.previousStatus !== null && monitor.previousStatus !== event.status) {
+                updateHistory(id, event.status);
                 if (event.status !== 'Unassigned') {
                     sendNotification('NES Outage Update', `${displayName}: Status changed to ${event.status}. A technician has been assigned!`);
                 } else {
                     sendNotification('NES Outage Update', `${displayName}: Status changed to ${event.status}`);
                 }
+                saveToStorage();
+            } else if (monitor.previousStatus === null) {
+                // Initial load - add to history without notification
+                updateHistory(id, event.status);
             }
             monitor.previousStatus = event.status;
 
             document.getElementById('lastChecked').textContent = `Last checked: ${new Date().toLocaleTimeString()}`;
+
+            if (sortByStatus) sortMonitors();
         }
 
         function formatDate(timestamp) {
@@ -759,6 +1147,8 @@
 
         // Initialize
         (function init() {
+            loadSettings();
+
             const params = new URLSearchParams(window.location.search);
             const monitorsParam = params.get('monitors');
             const eventsParam = params.get('events'); // Backwards compatibility
@@ -781,7 +1171,7 @@
                 // Try loading from localStorage
                 const saved = loadFromStorage();
                 if (saved && saved.length > 0) {
-                    saved.forEach(m => addMonitor(m.eventId, m.label));
+                    saved.forEach(m => addMonitor(m.eventId, m.label, m.history));
                 } else {
                     addMonitor();
                 }
