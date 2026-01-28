@@ -287,6 +287,49 @@
         .result.visible {
             display: block;
         }
+
+        .monitor-label {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #3d3d5c;
+            border-radius: 6px;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            font-size: 0.9rem;
+            margin-bottom: 12px;
+        }
+
+        .monitor-label:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .monitor-label::placeholder {
+            color: #555;
+        }
+
+        footer {
+            margin-top: 32px;
+            padding-top: 20px;
+            border-top: 1px solid #3d3d5c;
+            text-align: center;
+            font-size: 0.8rem;
+            color: #555;
+        }
+
+        footer a {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        .built-with {
+            margin-top: 8px;
+            color: #444;
+        }
     </style>
 </head>
 <body>
@@ -317,19 +360,43 @@
                 </button>
             </div>
         </div>
+
+        <footer>
+            <a href="https://github.com/NeckBeardPrince/nes-outage-status-checker" target="_blank">View on GitHub</a>
+            <div class="built-with">Built with Claude AI</div>
+        </footer>
     </div>
 
     <script>
         const API_URL = 'https://utilisocial.io/datacapable/v2/p/NES/map/events';
+        const STORAGE_KEY = 'nes-outage-monitors';
         let refreshTimer = null;
         let notificationsEnabled = false;
         let monitorId = 0;
         let monitors = {};
 
+        function saveToStorage() {
+            const data = Object.entries(monitors).map(([id, m]) => ({
+                eventId: m.eventId,
+                label: document.getElementById(`label-${id}`)?.value || ''
+            })).filter(m => m.eventId || m.label);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        }
+
+        function loadFromStorage() {
+            try {
+                const data = localStorage.getItem(STORAGE_KEY);
+                return data ? JSON.parse(data) : null;
+            } catch {
+                return null;
+            }
+        }
+
         function createMonitorHTML(id) {
             return `
                 <div class="monitor" id="monitor-${id}">
                     <button class="remove-btn" onclick="removeMonitor(${id})">×</button>
+                    <input type="text" class="monitor-label" id="label-${id}" placeholder="Custom label (e.g., Home, Office, Mom's house)" onchange="saveToStorage()">
                     <div class="monitor-header">
                         <input type="number" id="eventId-${id}" placeholder="Enter Event ID" onkeypress="handleKeypress(event, ${id})">
                         <button onclick="checkSingleMonitor(${id})">Check</button>
@@ -381,7 +448,7 @@
 
         const MAX_MONITORS = 4;
 
-        function addMonitor(eventId = null) {
+        function addMonitor(eventId = null, label = '') {
             if (Object.keys(monitors).length >= MAX_MONITORS) return null;
 
             const id = monitorId++;
@@ -389,6 +456,10 @@
 
             const container = document.getElementById('monitors');
             container.insertAdjacentHTML('beforeend', createMonitorHTML(id));
+
+            if (label) {
+                document.getElementById(`label-${id}`).value = label;
+            }
 
             if (eventId) {
                 document.getElementById(`eventId-${id}`).value = eventId;
@@ -417,6 +488,7 @@
                 updateURL();
                 updateRemoveButtons();
                 updateAddButton();
+                saveToStorage();
             }
         }
 
@@ -545,6 +617,7 @@
                 }
 
                 showResult(id, event);
+                saveToStorage();
 
                 if (getRefreshInterval() > 0) {
                     startAutoRefresh();
@@ -633,11 +706,13 @@
 
             // Check for status change and notify
             const monitor = monitors[id];
+            const label = document.getElementById(`label-${id}`)?.value;
+            const displayName = label || `Event ${event.id}`;
             if (monitor.previousStatus !== null && monitor.previousStatus !== event.status) {
                 if (event.status !== 'Unassigned') {
-                    sendNotification('NES Outage Update', `Event ${event.id}: Status changed to ${event.status}. A technician has been assigned!`);
+                    sendNotification('NES Outage Update', `${displayName}: Status changed to ${event.status}. A technician has been assigned!`);
                 } else {
-                    sendNotification('NES Outage Update', `Event ${event.id}: Status changed to ${event.status}`);
+                    sendNotification('NES Outage Update', `${displayName}: Status changed to ${event.status}`);
                 }
             }
             monitor.previousStatus = event.status;
@@ -662,10 +737,17 @@
             const eventsParam = params.get('events');
 
             if (eventsParam) {
+                // URL params take priority
                 const eventIds = eventsParam.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
                 eventIds.forEach(eventId => addMonitor(eventId));
             } else {
-                addMonitor();
+                // Try loading from localStorage
+                const saved = loadFromStorage();
+                if (saved && saved.length > 0) {
+                    saved.forEach(m => addMonitor(m.eventId, m.label));
+                } else {
+                    addMonitor();
+                }
             }
         })();
     </script>
