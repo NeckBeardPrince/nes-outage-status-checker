@@ -13,9 +13,9 @@ During outages, the NES outage map shows affected areas but doesn't clearly indi
 Requires Go 1.21+
 
 ```bash
-git clone https://github.com/yourusername/nes-status-checker.git
-cd nes-status-checker
-go build -o nes-status-checker
+git clone https://github.com/yourusername/nes-outage-status-checker.git
+cd nes-outage-status-checker
+go build -o nes-outage-status-checker
 ```
 
 ## Usage
@@ -24,12 +24,12 @@ go build -o nes-status-checker
 2. Run the checker with your event ID:
 
 ```bash
-./nes-status-checker <event-id>
+./nes-outage-status-checker <event-id>
 ```
 
 Example:
 ```bash
-./nes-status-checker 1971637
+./nes-outage-status-checker 1971637
 ```
 
 ## Features
