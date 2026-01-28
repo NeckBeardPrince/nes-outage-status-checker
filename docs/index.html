@@ -19,7 +19,7 @@
         }
 
         .container {
-            max-width: 500px;
+            max-width: 1000px;
             margin: 0 auto;
         }
 
@@ -50,8 +50,8 @@
         }
 
         .monitors {
-            display: flex;
-            flex-direction: column;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 16px;
         }
 
