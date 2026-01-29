@@ -528,6 +528,11 @@
                     <button id="gridViewBtn" class="active" onclick="setView('grid')">Grid</button>
                     <button id="mapViewBtn" onclick="setView('map')">Map</button>
                 </div>
+                <select id="filterStatus" onchange="fetchAllEvents()" title="Filter by status">
+                    <option value="all" selected>All Status</option>
+                    <option value="assigned">Assigned</option>
+                    <option value="unassigned">Unassigned</option>
+                </select>
                 <select id="filterAffected" onchange="fetchAllEvents()" title="Filter by minimum affected">
                     <option value="0">All</option>
                     <option value="2">2+ affected</option>
@@ -865,6 +870,14 @@
                 if (!response.ok) throw new Error('Failed to fetch outage data');
 
                 let events = await response.json();
+
+                // Filter by status
+                const statusFilter = document.getElementById('filterStatus').value;
+                if (statusFilter === 'assigned') {
+                    events = events.filter(e => e.status !== 'Unassigned');
+                } else if (statusFilter === 'unassigned') {
+                    events = events.filter(e => e.status === 'Unassigned');
+                }
 
                 // Filter by minimum affected
                 const minAffected = parseInt(document.getElementById('filterAffected').value) || 0;
