@@ -1442,15 +1442,21 @@
         setInterval(checkForUpdates, 5 * 60 * 1000);
         setTimeout(checkForUpdates, 1000); // First check after 1 second
 
-        // Domain banner
+        // Domain banner - only show on old GitHub Pages site
         function dismissDomainBanner() {
             document.getElementById('domainBanner').style.display = 'none';
             localStorage.setItem('nes-domain-banner-dismissed', 'true');
         }
 
-        if (localStorage.getItem('nes-domain-banner-dismissed') === 'true') {
-            document.getElementById('domainBanner').style.display = 'none';
-        }
+        (function() {
+            const isNewDomain = window.location.hostname === 'nes-outage-checker.com' ||
+                               window.location.hostname === 'www.nes-outage-checker.com';
+            const isDismissed = localStorage.getItem('nes-domain-banner-dismissed') === 'true';
+
+            if (isNewDomain || isDismissed) {
+                document.getElementById('domainBanner').style.display = 'none';
+            }
+        })();
 
         // Initialize
         loadSettings();

@@ -387,14 +387,21 @@
     </div>
 
     <script>
+        // Domain banner - only show on old GitHub Pages site
         function dismissDomainBanner() {
             document.getElementById('domainBanner').style.display = 'none';
             localStorage.setItem('nes-domain-banner-dismissed', 'true');
         }
 
-        if (localStorage.getItem('nes-domain-banner-dismissed') === 'true') {
-            document.getElementById('domainBanner').style.display = 'none';
-        }
+        (function() {
+            const isNewDomain = window.location.hostname === 'nes-outage-checker.com' ||
+                               window.location.hostname === 'www.nes-outage-checker.com';
+            const isDismissed = localStorage.getItem('nes-domain-banner-dismissed') === 'true';
+
+            if (isNewDomain || isDismissed) {
+                document.getElementById('domainBanner').style.display = 'none';
+            }
+        })();
     </script>
 </body>
 </html>
