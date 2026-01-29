@@ -6,17 +6,63 @@
     <title>NES Outage Status Checker</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
     <style>
+        :root {
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #16213e;
+            --bg-tertiary: #1a1a3e;
+            --border-color: #3d3d5c;
+            --text-primary: #e0e0e0;
+            --text-secondary: #a0a0a0;
+            --text-muted: #666;
+            --accent: #667eea;
+            --accent-secondary: #764ba2;
+            --success: #2ed573;
+            --danger: #ff6b6b;
+            --warning: #ffa502;
+        }
+
+        body.light-mode {
+            --bg-primary: #f5f5f5;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #e8e8e8;
+            --border-color: #d0d0d0;
+            --text-primary: #1a1a2e;
+            --text-secondary: #555;
+            --text-muted: #888;
+        }
+
+        body.colorblind-mode .status-unassigned {
+            background: repeating-linear-gradient(45deg, rgba(255,107,107,0.2), rgba(255,107,107,0.2) 4px, rgba(255,107,107,0.4) 4px, rgba(255,107,107,0.4) 8px);
+        }
+
+        body.colorblind-mode .status-assigned {
+            background: repeating-linear-gradient(-45deg, rgba(46,213,115,0.2), rgba(46,213,115,0.2) 4px, rgba(46,213,115,0.4) 4px, rgba(46,213,115,0.4) 8px);
+        }
+
+        body.colorblind-mode .status-badge::before {
+            margin-right: 6px;
+        }
+
+        body.colorblind-mode .status-unassigned::before {
+            content: '✗';
+        }
+
+        body.colorblind-mode .status-assigned::before {
+            content: '✓';
+        }
+
         * {
             box-sizing: border-box;
         }
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            background: #1a1a2e;
-            color: #e0e0e0;
+            background: var(--bg-primary);
+            color: var(--text-primary);
             min-height: 100vh;
             margin: 0;
             padding: 20px;
+            transition: background 0.3s, color 0.3s;
         }
 
         .container {
@@ -545,6 +591,55 @@
             color: white;
             font-weight: 600;
         }
+
+        .offline-banner {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: var(--danger);
+            color: white;
+            text-align: center;
+            padding: 10px;
+            font-size: 0.9rem;
+            z-index: 1001;
+        }
+
+        .countdown {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .countdown-ring {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--accent);
+            animation: countdown-spin 1s linear infinite;
+        }
+
+        @keyframes countdown-spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .keyboard-hint {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
     </style>
 </head>
 <body>
@@ -561,12 +656,19 @@
             <div class="summary-stats">
                 <span class="summary-stat">Monitors: <strong id="monitorCount">0</strong></span>
                 <span class="summary-stat">Total Affected: <strong id="totalAffected">0</strong></span>
+                <span class="summary-stat">Total Duration: <strong id="totalDuration">-</strong></span>
             </div>
             <div class="summary-actions">
-                <button class="icon-btn" onclick="copyURL()" title="Copy shareable URL">Copy URL</button>
+                <button class="icon-btn" onclick="copyURL()" title="Copy shareable URL (C)">Copy</button>
                 <button class="icon-btn" id="compactBtn" onclick="toggleCompactView()" title="Toggle compact view">Compact</button>
                 <button class="icon-btn" id="sortBtn" onclick="toggleSort()" title="Sort assigned first">Sort</button>
+                <button class="icon-btn" onclick="exportMonitors()" title="Export monitors">Export</button>
+                <button class="icon-btn" onclick="document.getElementById('importFile').click()" title="Import monitors">Import</button>
+                <button class="icon-btn" onclick="clearAllMonitors()" title="Clear all monitors">Clear</button>
+                <button class="icon-btn" id="themeBtn" onclick="toggleTheme()" title="Toggle light/dark mode (T)">Light</button>
+                <button class="icon-btn" id="colorblindBtn" onclick="toggleColorblind()" title="Toggle colorblind mode">A11y</button>
             </div>
+            <input type="file" id="importFile" class="file-input" accept=".json" onchange="importMonitors(event)">
         </div>
 
         <div class="monitors" id="monitors"></div>
@@ -574,7 +676,10 @@
         <button class="add-monitor-btn" onclick="addMonitor()">+ Add Monitor</button>
 
         <div class="meta">
-            <span id="lastChecked"></span>
+            <div class="countdown" id="countdownContainer">
+                <span id="lastChecked"></span>
+                <span id="nextRefresh"></span>
+            </div>
             <div class="options">
                 <div class="option-group">
                     <label for="refreshInterval">Refresh:</label>
@@ -601,11 +706,16 @@
             <a href="https://github.com/NeckBeardPrince/nes-outage-status-checker" target="_blank">GitHub</a>
             &middot;
             <a href="https://github.com/NeckBeardPrince/nes-outage-status-checker/blob/main/CHANGELOG.md" target="_blank">Changelog</a>
+            <div class="keyboard-hint">Keyboard: R=Refresh, N=Notifications, T=Theme, C=Copy URL</div>
             <div class="built-with">Built with Claude AI</div>
         </footer>
     </div>
 
     <div class="toast" id="toast">URL copied to clipboard!</div>
+
+    <div class="offline-banner hidden" id="offlineBanner">
+        You are offline. Data may be outdated.
+    </div>
 
     <div class="update-banner hidden" id="updateBanner">
         New version available! <a href="#" onclick="location.reload(); return false;">Refresh to update</a>
@@ -616,10 +726,14 @@
         const STORAGE_KEY = 'nes-outage-monitors';
         const SETTINGS_KEY = 'nes-outage-settings';
         let refreshTimer = null;
+        let countdownTimer = null;
+        let nextRefreshTime = null;
         let notificationsEnabled = false;
         let soundEnabled = false;
         let compactView = false;
         let sortByStatus = false;
+        let lightMode = false;
+        let colorblindMode = false;
         let monitorId = 0;
         let monitors = {};
 
@@ -669,7 +783,9 @@
             localStorage.setItem(SETTINGS_KEY, JSON.stringify({
                 compactView,
                 sortByStatus,
-                soundEnabled
+                soundEnabled,
+                lightMode,
+                colorblindMode
             }));
         }
 
@@ -681,6 +797,8 @@
                     compactView = settings.compactView || false;
                     sortByStatus = settings.sortByStatus || false;
                     soundEnabled = settings.soundEnabled || false;
+                    lightMode = settings.lightMode || false;
+                    colorblindMode = settings.colorblindMode || false;
                     updateSettingsUI();
                 }
             } catch {}
@@ -691,10 +809,149 @@
             document.getElementById('sortBtn').classList.toggle('active', sortByStatus);
             document.getElementById('soundBtn').textContent = `Sound: ${soundEnabled ? 'On' : 'Off'}`;
             document.getElementById('soundBtn').classList.toggle('enabled', soundEnabled);
+            document.getElementById('themeBtn').textContent = lightMode ? 'Dark' : 'Light';
+            document.getElementById('themeBtn').classList.toggle('active', lightMode);
+            document.getElementById('colorblindBtn').classList.toggle('active', colorblindMode);
+            document.body.classList.toggle('light-mode', lightMode);
+            document.body.classList.toggle('colorblind-mode', colorblindMode);
             if (compactView) {
                 document.querySelectorAll('.result').forEach(el => el.classList.add('compact'));
             }
         }
+
+        // Theme and accessibility toggles
+        function toggleTheme() {
+            lightMode = !lightMode;
+            document.body.classList.toggle('light-mode', lightMode);
+            document.getElementById('themeBtn').textContent = lightMode ? 'Dark' : 'Light';
+            document.getElementById('themeBtn').classList.toggle('active', lightMode);
+            saveSettings();
+        }
+
+        function toggleColorblind() {
+            colorblindMode = !colorblindMode;
+            document.body.classList.toggle('colorblind-mode', colorblindMode);
+            document.getElementById('colorblindBtn').classList.toggle('active', colorblindMode);
+            saveSettings();
+        }
+
+        // Export/Import functions
+        function exportMonitors() {
+            const data = {
+                monitors: Object.entries(monitors).map(([id, m]) => ({
+                    eventId: m.eventId,
+                    label: document.getElementById(`label-${id}`)?.value || '',
+                    history: m.history || []
+                })).filter(m => m.eventId),
+                exportedAt: new Date().toISOString()
+            };
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `nes-monitors-${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('Monitors exported!');
+        }
+
+        function importMonitors(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (data.monitors && Array.isArray(data.monitors)) {
+                        clearAllMonitors(true);
+                        data.monitors.forEach(m => addMonitor(m.eventId, m.label, m.history));
+                        showToast(`Imported ${data.monitors.length} monitors!`);
+                    }
+                } catch (err) {
+                    alert('Invalid file format');
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        function clearAllMonitors(silent = false) {
+            if (!silent && !confirm('Clear all monitors?')) return;
+            Object.keys(monitors).forEach(id => {
+                const el = document.getElementById(`monitor-${id}`);
+                if (el) el.remove();
+            });
+            monitors = {};
+            monitorId = 0;
+            updateURL();
+            saveToStorage();
+            addMonitor();
+            updateSummary();
+            if (!silent) showToast('All monitors cleared!');
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2000);
+        }
+
+        // Countdown timer
+        function updateCountdown() {
+            if (!nextRefreshTime) {
+                document.getElementById('nextRefresh').textContent = '';
+                return;
+            }
+            const remaining = Math.max(0, nextRefreshTime - Date.now());
+            const minutes = Math.floor(remaining / 60000);
+            const seconds = Math.floor((remaining % 60000) / 1000);
+            document.getElementById('nextRefresh').textContent = `• Next: ${minutes}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        // Total duration calculation
+        function updateTotalDuration() {
+            const activeMonitors = Object.values(monitors).filter(m => m.startTime);
+            if (activeMonitors.length === 0) {
+                document.getElementById('totalDuration').textContent = '-';
+                return;
+            }
+            const totalMs = activeMonitors.reduce((sum, m) => sum + (Date.now() - m.startTime), 0);
+            const hours = Math.floor(totalMs / (1000 * 60 * 60));
+            const minutes = Math.floor((totalMs % (1000 * 60 * 60)) / (1000 * 60));
+            document.getElementById('totalDuration').textContent = `${hours}h ${minutes}m`;
+        }
+
+        // Offline detection
+        function updateOnlineStatus() {
+            const offlineBanner = document.getElementById('offlineBanner');
+            if (navigator.onLine) {
+                offlineBanner.classList.add('hidden');
+            } else {
+                offlineBanner.classList.remove('hidden');
+            }
+        }
+        window.addEventListener('online', updateOnlineStatus);
+        window.addEventListener('offline', updateOnlineStatus);
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'INPUT') return;
+            switch(e.key.toLowerCase()) {
+                case 'r':
+                    refreshAllMonitors();
+                    break;
+                case 'n':
+                    toggleNotifications();
+                    break;
+                case 't':
+                    toggleTheme();
+                    break;
+                case 'c':
+                    copyURL();
+                    break;
+            }
+        });
 
         function createMonitorHTML(id) {
             return `
@@ -897,7 +1154,13 @@
             stopAutoRefresh();
             const interval = getRefreshInterval();
             if (interval > 0) {
-                refreshTimer = setInterval(refreshAllMonitors, interval);
+                nextRefreshTime = Date.now() + interval;
+                refreshTimer = setInterval(() => {
+                    refreshAllMonitors();
+                    nextRefreshTime = Date.now() + interval;
+                }, interval);
+                countdownTimer = setInterval(updateCountdown, 1000);
+                updateCountdown();
             }
         }
 
@@ -906,6 +1169,12 @@
                 clearInterval(refreshTimer);
                 refreshTimer = null;
             }
+            if (countdownTimer) {
+                clearInterval(countdownTimer);
+                countdownTimer = null;
+            }
+            nextRefreshTime = null;
+            updateCountdown();
         }
 
         async function toggleNotifications() {
@@ -1025,9 +1294,7 @@
 
         function copyURL() {
             navigator.clipboard.writeText(window.location.href).then(() => {
-                const toast = document.getElementById('toast');
-                toast.classList.add('show');
-                setTimeout(() => toast.classList.remove('show'), 2000);
+                showToast('URL copied to clipboard!');
             });
         }
 
@@ -1178,9 +1445,11 @@
             document.getElementById(`resTitle-${id}`).textContent = event.title;
             document.getElementById(`resAffected-${id}`).textContent = `${event.numPeople} people`;
 
-            // Store numPeople for summary
+            // Store numPeople and startTime for summary
             monitors[id].numPeople = event.numPeople;
+            monitors[id].startTime = event.startTime;
             updateSummary();
+            updateTotalDuration();
 
             const causeField = document.getElementById(`causeField-${id}`);
             if (event.cause) {
@@ -1248,7 +1517,7 @@
         }
 
         // Version check
-        const APP_VERSION = '1.1.0';
+        const APP_VERSION = '1.2.0';
 
         async function checkForUpdates() {
             try {
@@ -1271,6 +1540,7 @@
         // Initialize
         (function init() {
             loadSettings();
+            updateOnlineStatus();
 
             const params = new URLSearchParams(window.location.search);
             const monitorsParam = params.get('monitors');

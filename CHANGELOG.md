@@ -2,7 +2,26 @@
 
 All notable changes to the NES Outage Status Checker will be documented in this file.
 
-## [Unreleased]
+## [1.2.0] - 2026-01-28
+
+### Added
+
+#### Web App - Both Pages
+- **Light/dark mode toggle** - Switch between dark and light themes with the Theme button (or press T)
+- **Colorblind-friendly mode** - Accessible patterns and icons for color vision deficiencies
+- **Offline detection** - Banner notification when connection is lost
+- **Keyboard shortcuts** - R=Refresh, N=Notifications, T=Theme (C=Copy URL on monitor page)
+- **Countdown timer** - Visual countdown to next auto-refresh
+
+#### Web App - Monitor Page
+- **Export monitors** - Download monitor configuration as JSON backup
+- **Import monitors** - Restore monitors from a JSON file
+- **Clear all button** - Remove all monitors with one click
+- **Total outage duration** - Combined duration stat across all active monitors
+
+---
+
+## [1.1.0] - 2025-01-28
 
 ### Added
 

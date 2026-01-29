@@ -6,17 +6,59 @@
     <title>All Outages - NES Outage Status Checker</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
     <style>
+        :root {
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #16213e;
+            --text-primary: #e0e0e0;
+            --text-secondary: #a0a0a0;
+            --text-muted: #666;
+            --border-color: #3d3d5c;
+            --accent: #667eea;
+            --success: #2ed573;
+            --danger: #ff6b6b;
+        }
+
+        body.light-mode {
+            --bg-primary: #f5f5f5;
+            --bg-secondary: #ffffff;
+            --border-color: #d0d0d0;
+            --text-primary: #1a1a2e;
+            --text-secondary: #555;
+            --text-muted: #888;
+        }
+
+        body.colorblind-mode .status-unassigned {
+            background: repeating-linear-gradient(45deg, rgba(255,107,107,0.2), rgba(255,107,107,0.2) 4px, rgba(255,107,107,0.4) 4px, rgba(255,107,107,0.4) 8px);
+        }
+
+        body.colorblind-mode .status-assigned {
+            background: repeating-linear-gradient(-45deg, rgba(46,213,115,0.2), rgba(46,213,115,0.2) 4px, rgba(46,213,115,0.4) 4px, rgba(46,213,115,0.4) 8px);
+        }
+
+        body.colorblind-mode .status-badge::before {
+            margin-right: 6px;
+        }
+
+        body.colorblind-mode .status-unassigned::before {
+            content: '✗';
+        }
+
+        body.colorblind-mode .status-assigned::before {
+            content: '✓';
+        }
+
         * {
             box-sizing: border-box;
         }
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            background: #1a1a2e;
-            color: #e0e0e0;
+            background: var(--bg-primary);
+            color: var(--text-primary);
             min-height: 100vh;
             margin: 0;
             padding: 20px;
+            transition: background 0.3s, color 0.3s;
         }
 
         .container {
@@ -347,6 +389,31 @@
             color: white;
             font-weight: 600;
         }
+
+        .offline-banner {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: var(--danger);
+            color: white;
+            text-align: center;
+            padding: 10px;
+            font-size: 0.9rem;
+            z-index: 1001;
+        }
+
+        .countdown {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .keyboard-hint {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
     </style>
 </head>
 <body>
@@ -375,6 +442,8 @@
                 </select>
                 <button class="icon-btn" id="compactBtn" onclick="toggleCompactView()" title="Toggle compact view">Compact</button>
                 <button class="icon-btn active" id="sortBtn" onclick="toggleSort()" title="Sort assigned first">Sort</button>
+                <button class="icon-btn" id="themeBtn" onclick="toggleTheme()" title="Toggle light/dark mode (T)">Light</button>
+                <button class="icon-btn" id="colorblindBtn" onclick="toggleColorblind()" title="Toggle colorblind mode">A11y</button>
             </div>
         </div>
 
@@ -387,7 +456,10 @@
         <div class="events" id="events"></div>
 
         <div class="meta">
-            <span id="lastChecked"></span>
+            <div class="countdown" id="countdownContainer">
+                <span id="lastChecked"></span>
+                <span id="nextRefresh"></span>
+            </div>
             <div class="options">
                 <div class="option-group">
                     <label for="refreshInterval">Refresh:</label>
@@ -414,8 +486,13 @@
             <a href="https://github.com/NeckBeardPrince/nes-outage-status-checker" target="_blank">GitHub</a>
             &middot;
             <a href="https://github.com/NeckBeardPrince/nes-outage-status-checker/blob/main/CHANGELOG.md" target="_blank">Changelog</a>
+            <div class="keyboard-hint">Keyboard: R=Refresh, N=Notifications, T=Theme</div>
             <div class="built-with">Built with Claude AI</div>
         </footer>
+    </div>
+
+    <div class="offline-banner hidden" id="offlineBanner">
+        You are offline. Data may be outdated.
     </div>
 
     <div class="update-banner hidden" id="updateBanner">
@@ -426,10 +503,14 @@
         const API_URL = 'https://utilisocial.io/datacapable/v2/p/NES/map/events';
         const SETTINGS_KEY = 'nes-outage-all-settings';
         let refreshTimer = null;
+        let countdownTimer = null;
+        let nextRefreshTime = null;
         let notificationsEnabled = false;
         let soundEnabled = false;
         let compactView = false;
         let sortByStatus = true;
+        let lightMode = false;
+        let colorblindMode = false;
         let previousEvents = {};
         let audioContext = null;
 
@@ -458,7 +539,9 @@
             localStorage.setItem(SETTINGS_KEY, JSON.stringify({
                 compactView,
                 sortByStatus,
-                soundEnabled
+                soundEnabled,
+                lightMode,
+                colorblindMode
             }));
         }
 
@@ -470,6 +553,8 @@
                     compactView = settings.compactView || false;
                     sortByStatus = settings.sortByStatus !== false;
                     soundEnabled = settings.soundEnabled || false;
+                    lightMode = settings.lightMode || false;
+                    colorblindMode = settings.colorblindMode || false;
                     updateSettingsUI();
                 }
             } catch {}
@@ -480,7 +565,68 @@
             document.getElementById('sortBtn').classList.toggle('active', sortByStatus);
             document.getElementById('soundBtn').textContent = `Sound: ${soundEnabled ? 'On' : 'Off'}`;
             document.getElementById('soundBtn').classList.toggle('enabled', soundEnabled);
+            document.getElementById('themeBtn').textContent = lightMode ? 'Dark' : 'Light';
+            document.getElementById('themeBtn').classList.toggle('active', lightMode);
+            document.getElementById('colorblindBtn').classList.toggle('active', colorblindMode);
+            document.body.classList.toggle('light-mode', lightMode);
+            document.body.classList.toggle('colorblind-mode', colorblindMode);
         }
+
+        // Theme and accessibility toggles
+        function toggleTheme() {
+            lightMode = !lightMode;
+            document.body.classList.toggle('light-mode', lightMode);
+            document.getElementById('themeBtn').textContent = lightMode ? 'Dark' : 'Light';
+            document.getElementById('themeBtn').classList.toggle('active', lightMode);
+            saveSettings();
+        }
+
+        function toggleColorblind() {
+            colorblindMode = !colorblindMode;
+            document.body.classList.toggle('colorblind-mode', colorblindMode);
+            document.getElementById('colorblindBtn').classList.toggle('active', colorblindMode);
+            saveSettings();
+        }
+
+        // Countdown timer
+        function updateCountdown() {
+            if (!nextRefreshTime) {
+                document.getElementById('nextRefresh').textContent = '';
+                return;
+            }
+            const remaining = Math.max(0, nextRefreshTime - Date.now());
+            const minutes = Math.floor(remaining / 60000);
+            const seconds = Math.floor((remaining % 60000) / 1000);
+            document.getElementById('nextRefresh').textContent = `• Next: ${minutes}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        // Offline detection
+        function updateOnlineStatus() {
+            const offlineBanner = document.getElementById('offlineBanner');
+            if (navigator.onLine) {
+                offlineBanner.classList.add('hidden');
+            } else {
+                offlineBanner.classList.remove('hidden');
+            }
+        }
+        window.addEventListener('online', updateOnlineStatus);
+        window.addEventListener('offline', updateOnlineStatus);
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+            switch(e.key.toLowerCase()) {
+                case 'r':
+                    fetchAllEvents();
+                    break;
+                case 'n':
+                    toggleNotifications();
+                    break;
+                case 't':
+                    toggleTheme();
+                    break;
+            }
+        });
 
         function formatDate(timestamp) {
             return new Date(timestamp).toLocaleString('en-US', {
@@ -661,7 +807,13 @@
             stopAutoRefresh();
             const interval = parseInt(document.getElementById('refreshInterval').value);
             if (interval > 0) {
-                refreshTimer = setInterval(fetchAllEvents, interval);
+                nextRefreshTime = Date.now() + interval;
+                refreshTimer = setInterval(() => {
+                    fetchAllEvents();
+                    nextRefreshTime = Date.now() + interval;
+                }, interval);
+                countdownTimer = setInterval(updateCountdown, 1000);
+                updateCountdown();
             }
         }
 
@@ -670,6 +822,12 @@
                 clearInterval(refreshTimer);
                 refreshTimer = null;
             }
+            if (countdownTimer) {
+                clearInterval(countdownTimer);
+                countdownTimer = null;
+            }
+            nextRefreshTime = null;
+            updateCountdown();
         }
 
         document.getElementById('refreshInterval').addEventListener('change', startAutoRefresh);
@@ -733,7 +891,7 @@
         }
 
         // Version check
-        const APP_VERSION = '1.1.0';
+        const APP_VERSION = '1.2.0';
 
         async function checkForUpdates() {
             try {
@@ -755,6 +913,7 @@
 
         // Initialize
         loadSettings();
+        updateOnlineStatus();
         fetchAllEvents();
     </script>
 </body>
