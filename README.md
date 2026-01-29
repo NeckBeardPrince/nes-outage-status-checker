@@ -63,4 +63,4 @@ https://utilisocial.io/datacapable/v2/p/NES/map/events
 
 ## License
 
-MIT
+The Unlicense
