@@ -8,6 +8,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <style>
         :root {
             /* Typography */
@@ -236,6 +238,14 @@
             font-weight: 600;
             color: var(--text-primary);
             font-variant-numeric: tabular-nums;
+        }
+
+        .summary-stat.highlight strong {
+            color: var(--status-active);
+        }
+
+        .summary-stat.highlight .summary-stat-label {
+            color: var(--status-active);
         }
 
         .summary-actions {
@@ -1227,6 +1237,221 @@
             text-align: center;
         }
 
+        /* Crews Near Me Section */
+        .crews-nearby {
+            margin-top: 16px;
+            padding: 16px;
+            background: var(--status-active-bg);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 12px;
+        }
+
+        .crews-nearby-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .crews-nearby-icon {
+            font-size: 1.25rem;
+        }
+
+        .crews-nearby-title {
+            font-weight: 600;
+            color: var(--status-active);
+            font-size: 0.9375rem;
+        }
+
+        .crews-nearby-subtitle {
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+
+        .nearby-crew-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            margin-bottom: 6px;
+            font-size: 0.8125rem;
+        }
+
+        .nearby-crew-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .nearby-crew-status {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--status-active);
+            box-shadow: 0 0 6px var(--status-active);
+            animation: breathe 3s ease-in-out infinite;
+        }
+
+        .nearby-crew-details {
+            flex: 1;
+        }
+
+        .nearby-crew-event {
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .nearby-crew-meta {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .nearby-crew-distance {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        /* Crews Map Styles */
+        .crews-map-section {
+            margin-bottom: 24px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .crews-map-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.2s;
+        }
+
+        .crews-map-header:hover {
+            background: var(--bg-hover);
+        }
+
+        .crews-map-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: var(--text-primary);
+        }
+
+        .crews-map-pulse {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--status-active);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.8); }
+        }
+
+        .crews-map-toggle {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .crews-map-toggle-icon {
+            transition: transform 0.2s;
+        }
+
+        .crews-map-section.collapsed .crews-map-toggle-icon {
+            transform: rotate(-90deg);
+        }
+
+        .crews-map-body {
+            position: relative;
+            height: 250px;
+            overflow: hidden;
+            transition: height 0.3s ease;
+        }
+
+        .crews-map-section.collapsed .crews-map-body {
+            height: 0;
+        }
+
+        #crewsMap {
+            width: 100%;
+            height: 100%;
+        }
+
+        .crews-map-legend {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 8px 12px;
+            z-index: 1000;
+            font-size: 0.75rem;
+        }
+
+        .crews-map-legend .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--text-secondary);
+        }
+
+        .crews-map-legend .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .crews-map-legend .legend-dot.active {
+            background: var(--status-active);
+            box-shadow: 0 0 6px var(--status-active);
+        }
+
+        /* Leaflet popup styling */
+        .leaflet-popup-content-wrapper {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(28, 25, 23, 0.4);
+        }
+
+        .leaflet-popup-tip {
+            background: var(--bg-secondary);
+        }
+
+        .leaflet-popup-content {
+            margin: 12px 14px;
+            font-family: var(--font-body);
+            font-size: 0.8125rem;
+        }
+
+        .crew-popup-title {
+            font-family: var(--font-mono);
+            font-weight: 600;
+            color: var(--status-active);
+            margin-bottom: 4px;
+        }
+
+        .crew-popup-customers {
+            color: var(--text-secondary);
+        }
+
         /* Help Modal Specific */
         .lookup-help-modal .modal-body ol,
         .lookup-help-modal .modal-body ul {
@@ -1304,9 +1529,22 @@
 
         <div class="summary-bar">
             <div class="summary-stats">
-                <span class="summary-stat">Monitors: <strong id="monitorCount">0</strong></span>
-                <span class="summary-stat">Total Affected: <strong id="totalAffected">0</strong></span>
-                <span class="summary-stat">Total Duration: <strong id="totalDuration">-</strong></span>
+                <span class="summary-stat highlight">
+                    <span class="summary-stat-label">Crews Active</span>
+                    <strong id="crewsActive">-</strong>
+                </span>
+                <span class="summary-stat highlight">
+                    <span class="summary-stat-label">Being Restored</span>
+                    <strong id="customersBeingRestored">-</strong>
+                </span>
+                <span class="summary-stat">
+                    <span class="summary-stat-label">My Monitors</span>
+                    <strong id="monitorCount">0</strong>
+                </span>
+                <span class="summary-stat">
+                    <span class="summary-stat-label">Affected</span>
+                    <strong id="totalAffected">0</strong>
+                </span>
                 <span class="summary-stat" id="lastChecked"></span>
                 <span class="summary-stat countdown" id="nextRefresh"></span>
             </div>
@@ -1332,6 +1570,28 @@
                 <button class="icon-btn" id="colorblindBtn" onclick="toggleColorblind()" title="Toggle colorblind mode">A11y</button>
             </div>
             <input type="file" id="importFile" class="file-input" accept=".json" onchange="importMonitors(event)">
+        </div>
+
+        <div class="crews-map-section" id="crewsMapSection">
+            <div class="crews-map-header" onclick="toggleCrewsMap()">
+                <div class="crews-map-title">
+                    <span class="crews-map-pulse"></span>
+                    Where Crews Are Working
+                </div>
+                <div class="crews-map-toggle">
+                    <span id="crewsMapCount">0 crews</span>
+                    <span class="crews-map-toggle-icon">&#9660;</span>
+                </div>
+            </div>
+            <div class="crews-map-body" id="crewsMapBody">
+                <div id="crewsMap"></div>
+                <div class="crews-map-legend">
+                    <div class="legend-item">
+                        <span class="legend-dot active"></span>
+                        <span>Crew Active</span>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="monitors" id="monitors"></div>
@@ -1429,6 +1689,21 @@
         let monitorId = 0;
         let monitors = {};
 
+        // Activity feed state
+        let previousAllEventsState = {}; // Store previous state of all events for change detection
+        let crewsMapCollapsed = false;
+        const CREWS_MAP_KEY = 'nes-crews-map-collapsed';
+        let crewsMap = null;
+        let crewsMapMarkers = [];
+
+        // Dashboard stats
+        let systemStats = {
+            crewsActive: 0,
+            customersBeingRestored: 0,
+            totalOutages: 0,
+            totalCustomersAffected: 0
+        };
+
         // Audio context for notification sound
         let audioContext = null;
 
@@ -1517,6 +1792,17 @@
             document.getElementById('themeBtn').textContent = lightMode ? 'Dark' : 'Light';
             document.getElementById('themeBtn').classList.toggle('active', lightMode);
             saveSettings();
+
+            // Update map tiles for theme
+            if (crewsMap) {
+                crewsMap.eachLayer(layer => {
+                    if (layer instanceof L.TileLayer) crewsMap.removeLayer(layer);
+                });
+                const tileUrl = lightMode
+                    ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+                    : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+                L.tileLayer(tileUrl, { maxZoom: 19 }).addTo(crewsMap);
+            }
         }
 
         function toggleColorblind() {
@@ -1604,13 +1890,238 @@
         function updateTotalDuration() {
             const activeMonitors = Object.values(monitors).filter(m => m.startTime);
             if (activeMonitors.length === 0) {
-                document.getElementById('totalDuration').textContent = '-';
                 return;
             }
             const totalMs = activeMonitors.reduce((sum, m) => sum + (Date.now() - m.startTime), 0);
             const hours = Math.floor(totalMs / (1000 * 60 * 60));
             const minutes = Math.floor((totalMs % (1000 * 60 * 60)) / (1000 * 60));
-            document.getElementById('totalDuration').textContent = `${hours}h ${minutes}m`;
+        }
+
+        // Activity Feed Functions
+        function toggleCrewsMap() {
+            const section = document.getElementById('crewsMapSection');
+            crewsMapCollapsed = !crewsMapCollapsed;
+            section.classList.toggle('collapsed', crewsMapCollapsed);
+            localStorage.setItem(CREWS_MAP_KEY, crewsMapCollapsed);
+
+            // Invalidate map size when expanding (Leaflet needs this)
+            if (!crewsMapCollapsed && crewsMap) {
+                setTimeout(() => crewsMap.invalidateSize(), 300);
+            }
+        }
+
+        function loadCrewsMapState() {
+            crewsMapCollapsed = localStorage.getItem(CREWS_MAP_KEY) === 'true';
+            const section = document.getElementById('crewsMapSection');
+            if (section && crewsMapCollapsed) {
+                section.classList.add('collapsed');
+            }
+        }
+
+        function initCrewsMap() {
+            // Nashville center coordinates
+            crewsMap = L.map('crewsMap', {
+                zoomControl: true,
+                attributionControl: false
+            }).setView([36.1627, -86.7816], 10);
+
+            // Use appropriate tiles for current theme
+            const tileUrl = lightMode
+                ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+                : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+            L.tileLayer(tileUrl, { maxZoom: 19 }).addTo(crewsMap);
+        }
+
+        function updateCrewsMap(events) {
+            if (!crewsMap) return;
+
+            // Clear existing markers
+            crewsMapMarkers.forEach(marker => crewsMap.removeLayer(marker));
+            crewsMapMarkers = [];
+
+            // Filter to only assigned events with coordinates
+            const assignedEvents = events.filter(e =>
+                e.status !== 'Unassigned' && e.latitude && e.longitude
+            );
+
+            // Update count
+            document.getElementById('crewsMapCount').textContent =
+                `${assignedEvents.length} crew${assignedEvents.length !== 1 ? 's' : ''}`;
+
+            // Add markers for assigned events
+            assignedEvents.forEach(event => {
+                // Size based on customers affected
+                const radius = Math.min(Math.max(Math.sqrt(event.numPeople) * 0.8, 6), 25);
+
+                const marker = L.circleMarker([event.latitude, event.longitude], {
+                    radius: radius,
+                    fillColor: '#10B981',
+                    color: '#059669',
+                    weight: 2,
+                    opacity: 1,
+                    fillOpacity: 0.7
+                }).addTo(crewsMap);
+
+                marker.bindPopup(`
+                    <div class="crew-popup-title">Event ${event.id}</div>
+                    <div class="crew-popup-customers">${event.numPeople.toLocaleString()} customers</div>
+                `);
+
+                crewsMapMarkers.push(marker);
+            });
+
+            // Fit bounds if we have markers
+            if (crewsMapMarkers.length > 0) {
+                const group = L.featureGroup(crewsMapMarkers);
+                crewsMap.fitBounds(group.getBounds().pad(0.1));
+            }
+        }
+
+        // Keep detectActivityChanges for monitor notifications (simplified)
+        function detectActivityChanges(currentEvents) {
+            const changes = [];
+            const currentEventMap = {};
+
+            // Build map of current events
+            currentEvents.forEach(event => {
+                currentEventMap[event.id] = event;
+            });
+
+            // Check for status changes and resolved events
+            Object.entries(previousAllEventsState).forEach(([eventId, prevEvent]) => {
+                const currentEvent = currentEventMap[eventId];
+
+                if (!currentEvent) {
+                    changes.push({
+                        type: 'resolved',
+                        eventId: parseInt(eventId),
+                        customers: prevEvent.numPeople
+                    });
+                } else if (prevEvent.status === 'Unassigned' && currentEvent.status !== 'Unassigned') {
+                    changes.push({
+                        type: 'assigned',
+                        eventId: parseInt(eventId),
+                        customers: currentEvent.numPeople,
+                        status: currentEvent.status
+                    });
+                }
+            });
+
+            // Check for new events (only if we have previous state)
+            if (Object.keys(previousAllEventsState).length > 0) {
+                currentEvents.forEach(event => {
+                    if (!previousAllEventsState[event.id]) {
+                        changes.push({
+                            type: 'new',
+                            eventId: event.id,
+                            customers: event.numPeople
+                        });
+                    }
+                });
+            }
+
+            // Update previous state
+            previousAllEventsState = {};
+            currentEvents.forEach(event => {
+                previousAllEventsState[event.id] = {
+                    status: event.status,
+                    numPeople: event.numPeople
+                };
+            });
+
+            return changes;
+        }
+
+        function updateDashboardStats(events) {
+            // Calculate system-wide stats
+            const assignedEvents = events.filter(e => e.status !== 'Unassigned');
+            const customersBeingRestored = assignedEvents.reduce((sum, e) => sum + e.numPeople, 0);
+            const totalAffected = events.reduce((sum, e) => sum + e.numPeople, 0);
+
+            systemStats = {
+                crewsActive: assignedEvents.length,
+                customersBeingRestored: customersBeingRestored,
+                totalOutages: events.length,
+                totalCustomersAffected: totalAffected
+            };
+
+            // Update dashboard
+            document.getElementById('crewsActive').textContent = systemStats.crewsActive.toLocaleString();
+            document.getElementById('customersBeingRestored').textContent = systemStats.customersBeingRestored.toLocaleString();
+        }
+
+        async function fetchAllEventsAndUpdateDashboard() {
+            try {
+                const response = await fetch(API_URL);
+                if (!response.ok) return;
+
+                const events = await response.json();
+
+                // Update dashboard stats
+                updateDashboardStats(events);
+
+                // Update crews map
+                updateCrewsMap(events);
+
+                // Track state for change detection (used by monitor notifications)
+                detectActivityChanges(events);
+
+            } catch (err) {
+                console.log('Failed to fetch all events:', err);
+            }
+        }
+
+        // Find crews working within a certain radius
+        function findNearbyCrews(lat, lon, events, radiusMiles = 1) {
+            const results = [];
+
+            for (const event of events) {
+                // Only include assigned events (crews working)
+                if (event.status === 'Unassigned') continue;
+
+                if (event.latitude && event.longitude) {
+                    const distance = haversine(lat, lon, event.latitude, event.longitude);
+                    if (distance <= radiusMiles) {
+                        results.push({
+                            event,
+                            distance
+                        });
+                    }
+                }
+            }
+
+            // Sort by distance
+            results.sort((a, b) => a.distance - b.distance);
+
+            return results;
+        }
+
+        function displayNearbyCrews(monitorId, crews, userLat, userLon) {
+            const container = document.getElementById(`crewsNearby-${monitorId}`);
+            const titleEl = document.getElementById(`crewsNearbyTitle-${monitorId}`);
+            const listEl = document.getElementById(`crewsNearbyList-${monitorId}`);
+
+            if (crews.length === 0) {
+                container.classList.add('hidden');
+                return;
+            }
+
+            container.classList.remove('hidden');
+            titleEl.textContent = `${crews.length} crew${crews.length !== 1 ? 's' : ''} working within 1 mile`;
+
+            listEl.innerHTML = crews.map(c => {
+                const distanceStr = c.distance < 0.1 ? '< 0.1' : c.distance.toFixed(2);
+                return `
+                    <div class="nearby-crew-item">
+                        <div class="nearby-crew-status"></div>
+                        <div class="nearby-crew-details">
+                            <div class="nearby-crew-event">Event ${c.event.id}</div>
+                            <div class="nearby-crew-meta">${c.event.numPeople} customers &bull; ${c.event.status}</div>
+                        </div>
+                        <div class="nearby-crew-distance">${distanceStr} mi</div>
+                    </div>
+                `;
+            }).join('');
         }
 
         // Offline detection
@@ -1682,6 +2193,14 @@
                                 <span class="results-help" onclick="showLookupHelp()">How does this work?</span>
                             </div>
                             <div id="addressResultsList-${id}"></div>
+                            <div class="crews-nearby hidden" id="crewsNearby-${id}">
+                                <div class="crews-nearby-header">
+                                    <span class="crews-nearby-icon">&#128679;</span>
+                                    <span class="crews-nearby-title" id="crewsNearbyTitle-${id}">Crews working nearby</span>
+                                </div>
+                                <div class="crews-nearby-subtitle">Even if your outage isn't assigned yet, help is in your area!</div>
+                                <div id="crewsNearbyList-${id}"></div>
+                            </div>
                         </div>
                         <div class="privacy-note">Your address is sent to OpenStreetMap for geocoding only</div>
                     </div>
@@ -1818,6 +2337,7 @@
             document.getElementById(`addressError-${id}`).classList.add('hidden');
             document.getElementById(`addressResults-${id}`).classList.add('hidden');
             document.getElementById(`addressLoading-${id}`).classList.add('hidden');
+            document.getElementById(`crewsNearby-${id}`).classList.add('hidden');
         }
 
         function showLookupHelp() {
@@ -1961,6 +2481,7 @@
             document.getElementById(`addressLoading-${id}`).classList.remove('hidden');
             document.getElementById(`addressError-${id}`).classList.add('hidden');
             document.getElementById(`addressResults-${id}`).classList.add('hidden');
+            document.getElementById(`crewsNearby-${id}`).classList.add('hidden');
             document.getElementById(`searchBtn-${id}`).disabled = true;
 
             try {
@@ -1972,12 +2493,18 @@
                 if (!response.ok) throw new Error('Failed to fetch outage data');
                 const events = await response.json();
 
-                // Step 3: Find nearby outages
+                // Step 3: Find nearby outages (for user's potential outage)
                 const results = findNearbyOutages(location.lat, location.lon, events);
 
-                // Step 4: Display results
+                // Step 4: Find nearby crews (within 1 mile)
+                const nearbyCrews = findNearbyCrews(location.lat, location.lon, events, 1);
+
+                // Step 5: Display results
                 document.getElementById(`addressLoading-${id}`).classList.add('hidden');
                 displayAddressResults(id, results);
+
+                // Step 6: Display nearby crews (gives hope even if their outage isn't assigned)
+                displayNearbyCrews(id, nearbyCrews, location.lat, location.lon);
 
             } catch (err) {
                 document.getElementById(`addressLoading-${id}`).classList.add('hidden');
@@ -2275,6 +2802,12 @@
                 if (!response.ok) throw new Error('Failed to fetch outage data');
 
                 const events = await response.json();
+
+                // Update dashboard stats and crews map
+                updateDashboardStats(events);
+                updateCrewsMap(events);
+                detectActivityChanges(events);
+
                 const event = events.find(e => e.id === eventId);
 
                 if (!event) {
@@ -2297,7 +2830,6 @@
 
         async function refreshAllMonitors() {
             const activeMonitors = Object.entries(monitors).filter(([_, m]) => m.eventId !== null);
-            if (activeMonitors.length === 0) return;
 
             activeMonitors.forEach(([id]) => showLoading(id));
 
@@ -2307,6 +2839,12 @@
 
                 const events = await response.json();
 
+                // Update dashboard stats and crews map
+                updateDashboardStats(events);
+                updateCrewsMap(events);
+                detectActivityChanges(events);
+
+                // Update monitored events
                 activeMonitors.forEach(([id, monitor]) => {
                     const event = events.find(e => e.id === monitor.eventId);
                     if (event) {
@@ -2570,7 +3108,12 @@
         // Initialize
         (function init() {
             loadSettings();
+            loadCrewsMapState();
+            initCrewsMap();
             updateOnlineStatus();
+
+            // Fetch initial dashboard data and crews map
+            fetchAllEventsAndUpdateDashboard();
 
             const params = new URLSearchParams(window.location.search);
             const monitorsParam = params.get('monitors');
