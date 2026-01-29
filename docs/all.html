@@ -871,7 +871,17 @@
 
                 let events = await response.json();
 
-                // Filter by status
+                // Check for status changes on RAW data before filtering
+                if (Object.keys(previousEvents).length > 0) {
+                    checkForChanges(events);
+                } else {
+                    // Initial load - store previous events
+                    events.forEach(e => {
+                        previousEvents[e.id] = { status: e.status };
+                    });
+                }
+
+                // Filter by status (after change detection)
                 const statusFilter = document.getElementById('filterStatus').value;
                 if (statusFilter === 'assigned') {
                     events = events.filter(e => e.status !== 'Unassigned');
@@ -883,16 +893,6 @@
                 const minAffected = parseInt(document.getElementById('filterAffected').value) || 0;
                 if (minAffected > 0) {
                     events = events.filter(e => e.numPeople >= minAffected);
-                }
-
-                // Check for status changes before updating
-                if (Object.keys(previousEvents).length > 0) {
-                    checkForChanges(events);
-                } else {
-                    // Initial load - store previous events
-                    events.forEach(e => {
-                        previousEvents[e.id] = { status: e.status };
-                    });
                 }
 
                 // Sort: Assigned first when enabled
