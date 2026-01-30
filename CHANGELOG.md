@@ -2,6 +2,21 @@
 
 All notable changes to the NES Outage Status Checker will be documented in this file.
 
+## [1.7.0] - 2026-01-30
+
+*Thank you to [jjstafford](https://github.com/jjstafford) for [PR #6](https://github.com/NeckBeardPrince/nes-outage-status-checker/pull/6)!*
+
+### Added
+
+#### Web App - Both Pages
+- **Map style toggle** - Cycle between Dark, Light, and Aerial (satellite) map views
+- **Fullscreen mode** - Expand maps to fullscreen for better visibility
+- **Keyboard shortcuts** - S to cycle map style, F for fullscreen
+- **Responsive controls** - Map buttons show icons on mobile, text on desktop
+- **Style persistence** - Map style preference saved to localStorage
+
+---
+
 ## [1.6.0] - 2026-01-30
 
 *Thank you to [nico22nguyen](https://github.com/nico22nguyen) for [PR #5](https://github.com/NeckBeardPrince/nes-outage-status-checker/pull/5)!*
