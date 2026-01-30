@@ -1247,12 +1247,12 @@
                     <button id="gridViewBtn" class="active" onclick="setView('grid')">Grid</button>
                     <button id="mapViewBtn" onclick="setView('map')">Map</button>
                 </div>
-                <select id="filterStatus" onchange="fetchAllEvents()" title="Filter by status">
+                <select id="filterStatus" onchange="sortAndFilter()" title="Filter by status">
                     <option value="all" selected>All Status</option>
                     <option value="assigned">Assigned</option>
                     <option value="unassigned">Unassigned</option>
                 </select>
-                <select id="filterAffected" onchange="fetchAllEvents()" title="Filter by minimum affected">
+                <select id="filterAffected" onchange="sortAndFilter()" title="Filter by minimum affected">
                     <option value="0">All</option>
                     <option value="2">2+ affected</option>
                     <option value="10" selected>10+ affected</option>
@@ -1782,10 +1782,63 @@
             playNotificationSound();
         }
 
+        function sortAndFilter() {
+            let events = [...allEventsForMap];
+            const eventsEl = document.getElementById('events');
+            // Filter by minimum affected first (applies to all views)
+            const minAffected = parseInt(document.getElementById('filterAffected').value) || 0;
+            if (minAffected > 0) {
+                events = events.filter(e => e.numPeople >= minAffected);
+            }
+
+            // Store events after min-affected filter for summary stats
+            const eventsAfterMinFilter = [...events];
+
+            // Filter by status (after change detection) - for grid view
+            const statusFilter = document.getElementById('filterStatus').value;
+            if (statusFilter === 'assigned') {
+                events = events.filter(e => e.status !== 'Unassigned');
+            } else if (statusFilter === 'unassigned') {
+                events = events.filter(e => e.status === 'Unassigned');
+            }
+
+            // Apply sorting
+            if (sortBy === 'status') {
+                // Assigned first, then by affected
+                events.sort((a, b) => {
+                    const aAssigned = a.status !== 'Unassigned';
+                    const bAssigned = b.status !== 'Unassigned';
+                    if (aAssigned && !bAssigned) return -1;
+                    if (!aAssigned && bAssigned) return 1;
+                    return b.numPeople - a.numPeople;
+                });
+            } else if (sortBy === 'duration') {
+                // Oldest first (smallest startTime)
+                events.sort((a, b) => a.startTime - b.startTime);
+            } else if (sortBy === 'affected') {
+                // Most affected first
+                events.sort((a, b) => b.numPeople - a.numPeople);
+            } else if (sortBy === 'updated') {
+                // Most recently updated first (largest lastUpdatedTime)
+                events.sort((a, b) => b.lastUpdatedTime - a.lastUpdatedTime);
+            }
+
+            // Store events for grid view
+            currentEvents = events;
+
+            // Update summary with stats from min-affected filtered events (not status filtered)
+            updateSummary(events, eventsAfterMinFilter);
+            eventsEl.innerHTML = events.map(createEventCard).join('');
+
+            // Update map if in map view
+            if (currentView === 'map' && map) {
+                updateMapMarkers();
+            }
+        }
+
         async function fetchAllEvents() {
             const loadingEl = document.getElementById('loading');
             const errorEl = document.getElementById('error');
-            const eventsEl = document.getElementById('events');
 
             if (Object.keys(previousEvents).length === 0) {
                 loadingEl.classList.remove('hidden');
@@ -1815,58 +1868,9 @@
 
                 // Store all events for map (before any filtering)
                 allEventsForMap = [...events];
-
-                // Filter by minimum affected first (applies to all views)
-                const minAffected = parseInt(document.getElementById('filterAffected').value) || 0;
-                if (minAffected > 0) {
-                    events = events.filter(e => e.numPeople >= minAffected);
-                }
-
-                // Store events after min-affected filter for summary stats
-                const eventsAfterMinFilter = [...events];
-
-                // Filter by status (after change detection) - for grid view
-                const statusFilter = document.getElementById('filterStatus').value;
-                if (statusFilter === 'assigned') {
-                    events = events.filter(e => e.status !== 'Unassigned');
-                } else if (statusFilter === 'unassigned') {
-                    events = events.filter(e => e.status === 'Unassigned');
-                }
-
-                // Apply sorting
-                if (sortBy === 'status') {
-                    // Assigned first, then by affected
-                    events.sort((a, b) => {
-                        const aAssigned = a.status !== 'Unassigned';
-                        const bAssigned = b.status !== 'Unassigned';
-                        if (aAssigned && !bAssigned) return -1;
-                        if (!aAssigned && bAssigned) return 1;
-                        return b.numPeople - a.numPeople;
-                    });
-                } else if (sortBy === 'duration') {
-                    // Oldest first (smallest startTime)
-                    events.sort((a, b) => a.startTime - b.startTime);
-                } else if (sortBy === 'affected') {
-                    // Most affected first
-                    events.sort((a, b) => b.numPeople - a.numPeople);
-                } else if (sortBy === 'updated') {
-                    // Most recently updated first (largest lastUpdatedTime)
-                    events.sort((a, b) => b.lastUpdatedTime - a.lastUpdatedTime);
-                }
-
-                // Store events for grid view
-                currentEvents = events;
-
-                // Update summary with stats from min-affected filtered events (not status filtered)
-                updateSummary(events, eventsAfterMinFilter);
-                eventsEl.innerHTML = events.map(createEventCard).join('');
+                sortAndFilter();
+                
                 loadingEl.classList.add('hidden');
-
-                // Update map if in map view
-                if (currentView === 'map' && map) {
-                    updateMapMarkers();
-                }
-
                 document.getElementById('lastChecked').textContent = new Date().toLocaleTimeString();
 
                 startAutoRefresh();
@@ -2175,7 +2179,7 @@
         function applySort() {
             sortBy = document.getElementById('sortBy').value;
             saveSettings();
-            fetchAllEvents();
+            sortAndFilter();
         }
 
         // Map functions
