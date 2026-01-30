@@ -1247,12 +1247,12 @@
                     <button id="gridViewBtn" class="active" onclick="setView('grid')">Grid</button>
                     <button id="mapViewBtn" onclick="setView('map')">Map</button>
                 </div>
-                <select id="filterStatus" onchange="fetchAllEvents()" title="Filter by status">
+                <select id="filterStatus" onchange="sortAndFilter()" title="Filter by status">
                     <option value="all" selected>All Status</option>
                     <option value="assigned">Assigned</option>
                     <option value="unassigned">Unassigned</option>
                 </select>
-                <select id="filterAffected" onchange="fetchAllEvents()" title="Filter by minimum affected">
+                <select id="filterAffected" onchange="sortAndFilter()" title="Filter by minimum affected">
                     <option value="0">All</option>
                     <option value="2">2+ affected</option>
                     <option value="10" selected>10+ affected</option>
@@ -2179,7 +2179,7 @@
         function applySort() {
             sortBy = document.getElementById('sortBy').value;
             saveSettings();
-            fetchAllEvents();
+            sortAndFilter();
         }
 
         // Map functions
