@@ -2,6 +2,19 @@
 
 All notable changes to the NES Outage Status Checker will be documented in this file.
 
+## [1.5.0] - 2026-01-29
+
+### Added
+
+#### Web App - Monitor Page
+- **Find by Address** - Enter your street address to automatically find nearby outages instead of manually looking up Event IDs
+- **Smart matching algorithm** - Weights results by distance AND outage size (larger outages affecting more customers cover wider areas)
+- **Top 3 matches** - Shows the 3 best matches with confidence indicators (Best Match, Good Match, Possible)
+- **Help modal** - Explains how the address lookup works and why it might occasionally suggest the wrong event
+- **Privacy-focused** - Address is sent to OpenStreetMap for geocoding only, no data stored
+
+---
+
 ## [1.4.0] - 2026-01-29
 
 ### Added

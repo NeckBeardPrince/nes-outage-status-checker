@@ -5,36 +5,76 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>All Outages - NES Outage Status Checker</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <style>
         :root {
-            --bg-primary: #1a1a2e;
-            --bg-secondary: #16213e;
-            --text-primary: #e0e0e0;
-            --text-secondary: #a0a0a0;
-            --text-muted: #666;
-            --border-color: #3d3d5c;
-            --accent: #667eea;
-            --success: #2ed573;
-            --danger: #ff6b6b;
+            /* Typography */
+            --font-display: 'DM Serif Display', Georgia, serif;
+            --font-body: 'Outfit', system-ui, sans-serif;
+            --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+
+            /* Base tones - warm charcoal */
+            --bg-primary: #1C1917;
+            --bg-secondary: #292524;
+            --bg-tertiary: #3D3936;
+            --bg-hover: #44403C;
+            --border-color: rgba(168, 162, 158, 0.15);
+
+            /* Text hierarchy */
+            --text-primary: #FAFAF9;
+            --text-secondary: #A8A29E;
+            --text-muted: #78716C;
+
+            /* Status - waiting (amber) */
+            --status-waiting: #F59E0B;
+            --status-waiting-bg: rgba(245, 158, 11, 0.12);
+            --status-waiting-glow: rgba(245, 158, 11, 0.3);
+
+            /* Status - active (emerald) */
+            --status-active: #10B981;
+            --status-active-bg: rgba(16, 185, 129, 0.12);
+            --status-active-glow: rgba(16, 185, 129, 0.4);
+
+            /* Accent - warm orange */
+            --accent: #F97316;
+            --accent-muted: rgba(249, 115, 22, 0.15);
+            --accent-hover: #EA580C;
+
+            /* Legacy compatibility */
+            --success: #10B981;
+            --danger: #EF4444;
+            --warning: #F59E0B;
+
+            /* Shadows */
+            --shadow-sm: 0 1px 2px rgba(28, 25, 23, 0.3);
+            --shadow-md: 0 4px 12px rgba(28, 25, 23, 0.4);
+            --shadow-lg: 0 8px 24px rgba(28, 25, 23, 0.5);
         }
 
         body.light-mode {
-            --bg-primary: #f5f5f5;
-            --bg-secondary: #ffffff;
-            --border-color: #d0d0d0;
-            --text-primary: #1a1a2e;
-            --text-secondary: #555;
-            --text-muted: #888;
+            --bg-primary: #FAFAF9;
+            --bg-secondary: #FFFFFF;
+            --bg-tertiary: #F5F5F4;
+            --bg-hover: #E7E5E4;
+            --text-primary: #1C1917;
+            --text-secondary: #57534E;
+            --text-muted: #A8A29E;
+            --border-color: rgba(28, 25, 23, 0.1);
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+            --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.1);
         }
 
         body.colorblind-mode .status-unassigned {
-            background: repeating-linear-gradient(45deg, rgba(255,107,107,0.2), rgba(255,107,107,0.2) 4px, rgba(255,107,107,0.4) 4px, rgba(255,107,107,0.4) 8px);
+            background: repeating-linear-gradient(45deg, var(--status-waiting-bg), var(--status-waiting-bg) 4px, transparent 4px, transparent 8px);
         }
 
         body.colorblind-mode .status-assigned {
-            background: repeating-linear-gradient(-45deg, rgba(46,213,115,0.2), rgba(46,213,115,0.2) 4px, rgba(46,213,115,0.4) 4px, rgba(46,213,115,0.4) 8px);
+            background: repeating-linear-gradient(-45deg, var(--status-active-bg), var(--status-active-bg) 4px, transparent 4px, transparent 8px);
         }
 
         body.colorblind-mode .status-badge::before {
@@ -42,101 +82,170 @@
         }
 
         body.colorblind-mode .status-unassigned::before {
-            content: '✗';
+            content: '○ ';
         }
 
         body.colorblind-mode .status-assigned::before {
-            content: '✓';
+            content: '● ';
         }
 
         * {
             box-sizing: border-box;
         }
 
+        html {
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            font-family: var(--font-body);
             background: var(--bg-primary);
             color: var(--text-primary);
             min-height: 100vh;
             margin: 0;
-            padding: 20px;
+            padding: 24px;
             transition: background 0.3s, color 0.3s;
+            position: relative;
+        }
+
+        /* Atmospheric noise texture */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            opacity: 0.025;
+            z-index: 1000;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+        }
+
+        /* Ambient glow */
+        body::after {
+            content: '';
+            position: fixed;
+            top: -40%;
+            right: -20%;
+            width: 70%;
+            height: 70%;
+            background: radial-gradient(ellipse at center, rgba(249, 115, 22, 0.04) 0%, transparent 60%);
+            pointer-events: none;
+            z-index: -1;
         }
 
         .container {
             max-width: 1200px;
             margin: 0 auto;
+            position: relative;
+            z-index: 1;
         }
 
         header {
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: flex-end;
             margin-bottom: 24px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid var(--border-color);
             flex-wrap: wrap;
-            gap: 12px;
+            gap: 16px;
+        }
+
+        .header-brand {
+            flex: 1;
         }
 
         h1 {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: #fff;
-            padding: 12px 20px;
-            border-radius: 8px;
-            font-size: 1.4rem;
+            font-family: var(--font-display);
+            font-size: 1.75rem;
+            font-weight: 400;
+            color: var(--text-primary);
             margin: 0;
+            letter-spacing: -0.02em;
+            background: none;
+            padding: 0;
+        }
+
+        .header-subtitle {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            margin-top: 4px;
         }
 
         .header-links {
             display: flex;
-            gap: 16px;
+            gap: 8px;
             align-items: center;
         }
 
         .header-link {
-            color: #667eea;
+            color: var(--text-secondary);
             text-decoration: none;
-            font-size: 0.9rem;
+            font-size: 0.8125rem;
+            font-weight: 500;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            transition: all 0.2s;
         }
 
         .header-link:hover {
-            text-decoration: underline;
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border-color: var(--text-muted);
+            text-decoration: none;
         }
 
         .summary-bar {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 12px 16px;
-            background: #16213e;
-            border: 1px solid #3d3d5c;
-            border-radius: 8px;
-            margin-bottom: 16px;
+            padding: 16px 20px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            margin-bottom: 24px;
             flex-wrap: wrap;
-            gap: 12px;
+            gap: 16px;
         }
 
         .summary-stats {
             display: flex;
-            gap: 16px;
-            font-size: 0.85rem;
+            gap: 32px;
             flex-wrap: wrap;
             align-items: center;
         }
 
         .summary-stat {
-            color: #a0a0a0;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .summary-stat-label {
+            font-size: 0.6875rem;
+            font-weight: 500;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-muted);
         }
 
         .summary-stat strong {
-            color: #e0e0e0;
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            font-variant-numeric: tabular-nums;
         }
 
         .summary-stat.unassigned strong {
-            color: #ff6b6b;
+            color: var(--status-waiting);
         }
 
         .summary-stat.assigned strong {
-            color: #2ed573;
+            color: var(--status-active);
         }
 
         .summary-actions {
@@ -147,108 +256,140 @@
         }
 
         .icon-btn {
-            padding: 6px 12px;
-            background: #3d3d5c;
-            border: none;
-            border-radius: 6px;
-            color: #e0e0e0;
+            padding: 8px 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-secondary);
             cursor: pointer;
             font-size: 0.8rem;
+            font-family: var(--font-body);
+            font-weight: 500;
             transition: all 0.2s;
         }
 
         .icon-btn:hover {
-            background: #4d4d6c;
+            background: var(--bg-hover);
+            color: var(--text-primary);
         }
 
         .icon-btn.active {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--accent-muted);
+            color: var(--accent);
+            border-color: var(--accent);
         }
 
         .events {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 16px;
+            gap: 20px;
         }
 
         .event-card {
-            border: 2px solid #3d3d5c;
-            border-radius: 12px;
-            padding: 16px;
-            background: #16213e;
-            transition: all 0.2s;
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 20px;
+            background: var(--bg-secondary);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+            animation: cardEntrance 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes cardEntrance {
+            from {
+                opacity: 0;
+                transform: translateY(16px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .event-card:hover {
+            border-color: rgba(249, 115, 22, 0.5);
+            box-shadow: var(--shadow-md);
         }
 
         .event-card.unassigned {
-            border-color: #ff6b6b55;
+            border-color: rgba(245, 158, 11, 0.3);
         }
 
         .event-card.assigned {
-            border-color: #2ed57355;
+            border-color: var(--status-active);
+            box-shadow: var(--shadow-md), 0 0 40px var(--status-active-glow);
         }
 
         .event-header {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-bottom: 12px;
+            margin-bottom: 16px;
         }
 
         .event-title {
             font-weight: 600;
-            color: #e0e0e0;
-            font-size: 0.95rem;
+            color: var(--text-primary);
+            font-size: 1rem;
         }
 
         .event-id {
-            color: #666;
+            color: var(--text-muted);
             font-size: 0.8rem;
-            font-family: monospace;
+            font-family: var(--font-mono);
         }
 
         .field {
-            margin-bottom: 8px;
-            font-size: 0.85rem;
+            margin-bottom: 10px;
+            font-size: 0.875rem;
         }
 
         .label {
-            font-weight: 600;
-            color: #a0a0a0;
+            font-weight: 500;
+            color: var(--text-muted);
             margin-right: 6px;
+            text-transform: uppercase;
+            font-size: 0.6875rem;
+            letter-spacing: 0.05em;
         }
 
         .value {
-            color: #e0e0e0;
+            color: var(--text-primary);
         }
 
         .status-badge {
-            font-size: 0.9rem;
-            font-weight: 700;
-            padding: 4px 10px;
-            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 6px 12px;
+            border-radius: 20px;
             display: inline-block;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
 
         .status-unassigned {
-            background: rgba(255, 107, 107, 0.2);
-            color: #ff6b6b;
+            background: var(--status-waiting-bg);
+            color: var(--status-waiting);
+            border: 1px solid rgba(245, 158, 11, 0.3);
         }
 
         .status-assigned {
-            background: rgba(46, 213, 115, 0.2);
-            color: #2ed573;
-            animation: pulse 1s ease-in-out infinite;
+            background: var(--status-active-bg);
+            color: var(--status-active);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            animation: breathe 3s ease-in-out infinite;
         }
 
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+        @keyframes breathe {
+            0%, 100% { box-shadow: 0 0 8px var(--status-active), 0 0 30px var(--status-active-glow); }
+            50% { box-shadow: 0 0 12px var(--status-active), 0 0 50px var(--status-active-glow); }
         }
 
         .duration {
-            color: #ffa502;
-            font-size: 0.8rem;
-            margin-top: 8px;
+            color: var(--accent);
+            font-size: 0.8125rem;
+            margin-top: 12px;
+            font-family: var(--font-mono);
         }
 
         .details-content {
@@ -266,15 +407,15 @@
         .loading {
             text-align: center;
             padding: 60px 20px;
-            color: #a0a0a0;
+            color: var(--text-secondary);
         }
 
         .spinner {
             display: inline-block;
             width: 24px;
             height: 24px;
-            border: 3px solid #3d3d5c;
-            border-top-color: #667eea;
+            border: 3px solid var(--bg-tertiary);
+            border-top-color: var(--accent);
             border-radius: 50%;
             animation: spin 1s linear infinite;
             margin-right: 10px;
@@ -288,44 +429,50 @@
         .error {
             text-align: center;
             padding: 60px 20px;
-            color: #ff6b6b;
+            color: var(--danger);
         }
 
         select {
-            padding: 4px 8px;
-            border: 1px solid #3d3d5c;
-            border-radius: 4px;
-            background: #16213e;
-            color: #e0e0e0;
-            font-size: 0.85rem;
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 0.875rem;
+            font-family: var(--font-body);
+            cursor: pointer;
+            transition: all 0.2s;
         }
 
         select:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-muted);
         }
 
         footer {
-            margin-top: 32px;
-            padding-top: 20px;
-            border-top: 1px solid #3d3d5c;
+            margin-top: 48px;
+            padding-top: 24px;
+            border-top: 1px solid var(--border-color);
             text-align: center;
-            font-size: 0.8rem;
-            color: #555;
+            font-size: 0.8125rem;
+            color: var(--text-muted);
         }
 
         footer a {
-            color: #667eea;
+            color: var(--accent);
             text-decoration: none;
+            transition: color 0.2s;
         }
 
         footer a:hover {
-            text-decoration: underline;
+            color: var(--accent-hover);
         }
 
         .built-with {
             margin-top: 8px;
-            color: #444;
+            color: var(--text-muted);
+            opacity: 0.7;
         }
 
         .hidden {
@@ -337,12 +484,13 @@
             top: 0;
             left: 0;
             right: 0;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--accent);
             color: white;
             text-align: center;
-            padding: 10px;
+            padding: 12px;
             font-size: 0.9rem;
             z-index: 1000;
+            font-weight: 500;
         }
 
         .update-banner a {
@@ -351,13 +499,13 @@
         }
 
         .new-domain-banner {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--accent);
             color: white;
             text-align: center;
             padding: 12px 20px;
             font-size: 0.9rem;
             position: relative;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            box-shadow: var(--shadow-md);
         }
 
         .new-domain-banner a {
@@ -401,19 +549,23 @@
             background: var(--danger);
             color: white;
             text-align: center;
-            padding: 10px;
+            padding: 12px;
             font-size: 0.9rem;
             z-index: 1001;
+            font-weight: 500;
         }
 
         .countdown {
             display: inline-flex;
             align-items: center;
-            gap: 6px;
+            gap: 8px;
+            font-family: var(--font-mono);
+            font-size: 0.875rem;
         }
 
         .keyboard-hint {
-            font-size: 0.7rem;
+            font-size: 0.6875rem;
+            font-family: var(--font-mono);
             color: var(--text-muted);
             margin-top: 4px;
         }
@@ -425,7 +577,8 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(28, 25, 23, 0.8);
+            backdrop-filter: blur(4px);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -436,38 +589,41 @@
         .modal {
             background: var(--bg-secondary);
             border: 1px solid var(--border-color);
-            border-radius: 12px;
+            border-radius: 16px;
             max-width: 600px;
             width: 100%;
             max-height: 80vh;
             display: flex;
             flex-direction: column;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            box-shadow: var(--shadow-lg);
         }
 
         .modal-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 16px 20px;
+            padding: 20px 24px;
             border-bottom: 1px solid var(--border-color);
         }
 
         .modal-title {
-            font-size: 1.2rem;
-            font-weight: 600;
+            font-family: var(--font-display);
+            font-size: 1.25rem;
+            font-weight: 400;
             color: var(--text-primary);
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
         }
 
         .modal-version {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--accent);
             color: white;
-            padding: 4px 10px;
+            padding: 4px 12px;
             border-radius: 20px;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
+            font-family: var(--font-mono);
+            font-weight: 500;
         }
 
         .modal-close {
@@ -478,6 +634,7 @@
             cursor: pointer;
             padding: 0;
             line-height: 1;
+            transition: color 0.2s;
         }
 
         .modal-close:hover {
@@ -485,17 +642,19 @@
         }
 
         .modal-body {
-            padding: 20px;
+            padding: 24px;
             overflow-y: auto;
             color: var(--text-secondary);
             font-size: 0.9rem;
-            line-height: 1.6;
+            line-height: 1.7;
         }
 
         .modal-body h2, .modal-body h3, .modal-body h4 {
+            font-family: var(--font-display);
             color: var(--text-primary);
-            margin-top: 16px;
-            margin-bottom: 8px;
+            margin-top: 20px;
+            margin-bottom: 12px;
+            font-weight: 400;
         }
 
         .modal-body h2:first-child {
@@ -503,12 +662,12 @@
         }
 
         .modal-body ul {
-            margin: 8px 0;
+            margin: 12px 0;
             padding-left: 20px;
         }
 
         .modal-body li {
-            margin-bottom: 4px;
+            margin-bottom: 6px;
         }
 
         .modal-body strong {
@@ -517,41 +676,47 @@
 
         .modal-body code {
             background: var(--bg-primary);
-            padding: 2px 6px;
+            padding: 2px 8px;
             border-radius: 4px;
             font-size: 0.85em;
+            font-family: var(--font-mono);
         }
 
         .modal-footer {
-            padding: 16px 20px;
+            padding: 20px 24px;
             border-top: 1px solid var(--border-color);
             display: flex;
             justify-content: flex-end;
-            gap: 10px;
+            gap: 12px;
         }
 
         .modal-btn {
-            padding: 8px 20px;
-            border-radius: 6px;
-            font-size: 0.9rem;
+            padding: 10px 24px;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-family: var(--font-body);
+            font-weight: 600;
             cursor: pointer;
             border: none;
             transition: all 0.2s;
         }
 
         .modal-btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--accent);
             color: white;
         }
 
         .modal-btn-primary:hover {
-            opacity: 0.9;
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.25);
         }
 
         #map {
             height: 600px;
-            border-radius: 12px;
-            border: 2px solid var(--border-color);
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-md);
         }
 
         .map-container {
@@ -564,23 +729,27 @@
             right: 10px;
             background: var(--bg-secondary);
             border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 12px 16px;
+            border-radius: 12px;
+            padding: 16px 20px;
             z-index: 1000;
-            font-size: 0.85rem;
+            font-size: 0.8125rem;
+            box-shadow: var(--shadow-md);
         }
 
         .legend-title {
             font-weight: 600;
-            margin-bottom: 8px;
+            margin-bottom: 12px;
             color: var(--text-primary);
+            text-transform: uppercase;
+            font-size: 0.6875rem;
+            letter-spacing: 0.08em;
         }
 
         .legend-item {
             display: flex;
             align-items: center;
-            gap: 8px;
-            margin-bottom: 6px;
+            gap: 10px;
+            margin-bottom: 8px;
             color: var(--text-secondary);
         }
 
@@ -596,19 +765,20 @@
         }
 
         .legend-dot.unassigned {
-            background: #ff6b6b;
-            border-color: #cc5555;
+            background: var(--status-waiting);
+            border-color: #D97706;
         }
 
         .legend-dot.assigned {
-            background: #2ed573;
-            border-color: #25aa5c;
+            background: var(--status-active);
+            border-color: #059669;
         }
 
         .leaflet-popup-content-wrapper {
             background: var(--bg-secondary);
             color: var(--text-primary);
-            border-radius: 8px;
+            border-radius: 12px;
+            box-shadow: var(--shadow-md);
         }
 
         .leaflet-popup-tip {
@@ -641,13 +811,13 @@
         }
 
         .popup-status.unassigned {
-            background: rgba(255, 107, 107, 0.2);
-            color: #ff6b6b;
+            background: var(--status-waiting-bg);
+            color: var(--status-waiting);
         }
 
         .popup-status.assigned {
-            background: rgba(46, 213, 115, 0.2);
-            color: #2ed573;
+            background: var(--status-active-bg);
+            color: var(--status-active);
         }
 
         .view-toggle {
@@ -676,6 +846,44 @@
         .view-toggle button:hover:not(.active) {
             color: var(--text-primary);
         }
+
+        /* Map toggle for showing waiting outages */
+        .map-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border-color);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .map-toggle input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--status-waiting);
+            cursor: pointer;
+        }
+
+        .map-toggle-label {
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .map-toggle:hover .map-toggle-label {
+            color: var(--text-primary);
+        }
+
+        /* Summary stat improvements */
+        .summary-stat.assigned strong {
+            color: var(--status-active);
+        }
+
+        .summary-stat.unassigned strong {
+            color: var(--status-waiting);
+        }
     </style>
 </head>
 <body>
@@ -687,19 +895,34 @@
 
     <div class="container">
         <header>
-            <h1>All NES Outages</h1>
+            <div class="header-brand">
+                <h1>All NES Outages</h1>
+                <p class="header-subtitle">Real-time view of all active outage events</p>
+            </div>
             <div class="header-links">
-                <a href="index.html" class="header-link">&larr; Back to Monitor</a>
-                <a href="how-it-works.html" class="header-link" style="color: #ff6b6b;">How does this work?</a>
+                <a href="index.html" class="header-link">Monitor</a>
+                <a href="how-it-works.html" class="header-link">How It Works</a>
             </div>
         </header>
 
         <div class="summary-bar">
             <div class="summary-stats">
-                <span class="summary-stat">Total: <strong id="totalCount">0</strong></span>
-                <span class="summary-stat unassigned">Unassigned: <strong id="unassignedCount">0</strong></span>
-                <span class="summary-stat assigned">Assigned: <strong id="assignedCount">0</strong></span>
-                <span class="summary-stat">Affected: <strong id="totalAffected">0</strong></span>
+                <span class="summary-stat assigned">
+                    <span class="summary-stat-label">Active Crews</span>
+                    <strong id="assignedCount">0</strong>
+                </span>
+                <span class="summary-stat assigned">
+                    <span class="summary-stat-label">Customers Being Restored</span>
+                    <strong id="assignedAffected">0</strong>
+                </span>
+                <span class="summary-stat">
+                    <span class="summary-stat-label">Total Events</span>
+                    <strong id="totalCount">0</strong>
+                </span>
+                <span class="summary-stat unassigned" style="opacity: 0.7;">
+                    <span class="summary-stat-label">Waiting for Crew</span>
+                    <strong id="unassignedCount">0</strong>
+                </span>
                 <span class="summary-stat" id="lastChecked"></span>
                 <span class="summary-stat countdown" id="nextRefresh"></span>
             </div>
@@ -757,15 +980,19 @@
         <div class="map-container hidden" id="mapContainer">
             <div id="map"></div>
             <div class="map-legend">
-                <div class="legend-title">Status</div>
+                <div class="legend-title">Active Crews</div>
                 <div class="legend-item">
                     <span class="legend-dot assigned"></span>
-                    <span>Assigned</span>
+                    <span>Crew Working</span>
                 </div>
-                <div class="legend-item">
+                <div class="legend-item waiting-legend" style="display: none;">
                     <span class="legend-dot unassigned"></span>
-                    <span>Unassigned</span>
+                    <span>Waiting for Crew</span>
                 </div>
+                <label class="map-toggle">
+                    <input type="checkbox" id="showWaitingToggle" onchange="toggleShowWaiting()">
+                    <span class="map-toggle-label">Show Waiting</span>
+                </label>
             </div>
         </div>
 
@@ -826,6 +1053,8 @@
         let map = null;
         let markers = [];
         let currentEvents = [];
+        let allEventsForMap = []; // Store all events (unfiltered) for map
+        let showWaitingOnMap = false;
 
         function playNotificationSound() {
             if (!soundEnabled) return;
@@ -1000,15 +1229,20 @@
             `;
         }
 
-        function updateSummary(events) {
-            const unassigned = events.filter(e => e.status === 'Unassigned').length;
-            const assigned = events.length - unassigned;
-            const totalAffected = events.reduce((sum, e) => sum + (e.numPeople || 0), 0);
+        function updateSummary(events, allEvents) {
+            // Use allEvents for overall stats (unfiltered by status dropdown)
+            const eventsToCount = allEvents || events;
+            const assignedEvents = eventsToCount.filter(e => e.status !== 'Unassigned');
+            const unassignedEvents = eventsToCount.filter(e => e.status === 'Unassigned');
 
-            document.getElementById('totalCount').textContent = events.length;
+            const assigned = assignedEvents.length;
+            const unassigned = unassignedEvents.length;
+            const assignedAffected = assignedEvents.reduce((sum, e) => sum + (e.numPeople || 0), 0);
+
+            document.getElementById('totalCount').textContent = eventsToCount.length;
             document.getElementById('unassignedCount').textContent = unassigned;
             document.getElementById('assignedCount').textContent = assigned;
-            document.getElementById('totalAffected').textContent = totalAffected.toLocaleString();
+            document.getElementById('assignedAffected').textContent = assignedAffected.toLocaleString();
         }
 
         function checkForChanges(events) {
@@ -1087,18 +1321,24 @@
                     });
                 }
 
-                // Filter by status (after change detection)
+                // Store all events for map (before any filtering)
+                allEventsForMap = [...events];
+
+                // Filter by minimum affected first (applies to all views)
+                const minAffected = parseInt(document.getElementById('filterAffected').value) || 0;
+                if (minAffected > 0) {
+                    events = events.filter(e => e.numPeople >= minAffected);
+                }
+
+                // Store events after min-affected filter for summary stats
+                const eventsAfterMinFilter = [...events];
+
+                // Filter by status (after change detection) - for grid view
                 const statusFilter = document.getElementById('filterStatus').value;
                 if (statusFilter === 'assigned') {
                     events = events.filter(e => e.status !== 'Unassigned');
                 } else if (statusFilter === 'unassigned') {
                     events = events.filter(e => e.status === 'Unassigned');
-                }
-
-                // Filter by minimum affected
-                const minAffected = parseInt(document.getElementById('filterAffected').value) || 0;
-                if (minAffected > 0) {
-                    events = events.filter(e => e.numPeople >= minAffected);
                 }
 
                 // Apply sorting
@@ -1119,10 +1359,11 @@
                     events.sort((a, b) => b.numPeople - a.numPeople);
                 }
 
-                // Store events for map
+                // Store events for grid view
                 currentEvents = events;
 
-                updateSummary(events);
+                // Update summary with stats from min-affected filtered events (not status filtered)
+                updateSummary(events, eventsAfterMinFilter);
                 eventsEl.innerHTML = events.map(createEventCard).join('');
                 loadingEl.classList.add('hidden');
 
@@ -1241,8 +1482,9 @@
         function createMarkerIcon(isAssigned, numPeople) {
             // Size based on affected people (min 20, max 40)
             const size = Math.min(40, Math.max(20, 10 + Math.sqrt(numPeople) * 2));
-            const color = isAssigned ? '#2ed573' : '#ff6b6b';
-            const borderColor = isAssigned ? '#25aa5c' : '#cc5555';
+            // Use theme colors: emerald for assigned (crews working), amber for waiting
+            const color = isAssigned ? '#10B981' : '#F59E0B';
+            const borderColor = isAssigned ? '#059669' : '#D97706';
 
             return L.divIcon({
                 className: 'custom-marker',
@@ -1271,8 +1513,26 @@
             markers.forEach(m => map.removeLayer(m));
             markers = [];
 
+            // Get min affected filter
+            const minAffected = parseInt(document.getElementById('filterAffected').value) || 0;
+
+            // Filter events for map based on toggle state
+            // Map uses allEventsForMap (ignores status dropdown) but respects min affected
+            let eventsToShow = allEventsForMap.filter(e => e.numPeople >= minAffected);
+
+            // Apply the "show waiting" filter - default is assigned only
+            if (!showWaitingOnMap) {
+                eventsToShow = eventsToShow.filter(e => e.status !== 'Unassigned');
+            }
+
+            // Update legend visibility
+            const waitingLegend = document.querySelector('.waiting-legend');
+            if (waitingLegend) {
+                waitingLegend.style.display = showWaitingOnMap ? 'flex' : 'none';
+            }
+
             // Add new markers
-            currentEvents.forEach(event => {
+            eventsToShow.forEach(event => {
                 // Check if event has coordinates
                 if (event.latitude && event.longitude) {
                     const isAssigned = event.status !== 'Unassigned';
@@ -1298,6 +1558,13 @@
             if (markers.length > 0) {
                 const group = L.featureGroup(markers);
                 map.fitBounds(group.getBounds().pad(0.1));
+            }
+        }
+
+        function toggleShowWaiting() {
+            showWaitingOnMap = document.getElementById('showWaitingToggle').checked;
+            if (map) {
+                updateMapMarkers();
             }
         }
 

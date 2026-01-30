@@ -5,38 +5,76 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NES Outage Status Checker</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <style>
         :root {
-            --bg-primary: #1a1a2e;
-            --bg-secondary: #16213e;
-            --bg-tertiary: #1a1a3e;
-            --border-color: #3d3d5c;
-            --text-primary: #e0e0e0;
-            --text-secondary: #a0a0a0;
-            --text-muted: #666;
-            --accent: #667eea;
-            --accent-secondary: #764ba2;
-            --success: #2ed573;
-            --danger: #ff6b6b;
-            --warning: #ffa502;
+            /* Typography */
+            --font-display: 'DM Serif Display', Georgia, serif;
+            --font-body: 'Outfit', system-ui, sans-serif;
+            --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+
+            /* Base tones - warm charcoal */
+            --bg-primary: #1C1917;
+            --bg-secondary: #292524;
+            --bg-tertiary: #3D3936;
+            --bg-hover: #44403C;
+            --border-color: rgba(168, 162, 158, 0.15);
+
+            /* Text hierarchy */
+            --text-primary: #FAFAF9;
+            --text-secondary: #A8A29E;
+            --text-muted: #78716C;
+
+            /* Status - waiting (amber) */
+            --status-waiting: #F59E0B;
+            --status-waiting-bg: rgba(245, 158, 11, 0.12);
+            --status-waiting-glow: rgba(245, 158, 11, 0.3);
+
+            /* Status - active (emerald) */
+            --status-active: #10B981;
+            --status-active-bg: rgba(16, 185, 129, 0.12);
+            --status-active-glow: rgba(16, 185, 129, 0.4);
+
+            /* Accent - warm orange */
+            --accent: #F97316;
+            --accent-muted: rgba(249, 115, 22, 0.15);
+            --accent-hover: #EA580C;
+
+            /* Legacy compatibility */
+            --success: #10B981;
+            --danger: #EF4444;
+            --warning: #F59E0B;
+
+            /* Shadows */
+            --shadow-sm: 0 1px 2px rgba(28, 25, 23, 0.3);
+            --shadow-md: 0 4px 12px rgba(28, 25, 23, 0.4);
+            --shadow-lg: 0 8px 24px rgba(28, 25, 23, 0.5);
         }
 
         body.light-mode {
-            --bg-primary: #f5f5f5;
-            --bg-secondary: #ffffff;
-            --bg-tertiary: #e8e8e8;
-            --border-color: #d0d0d0;
-            --text-primary: #1a1a2e;
-            --text-secondary: #555;
-            --text-muted: #888;
+            --bg-primary: #FAFAF9;
+            --bg-secondary: #FFFFFF;
+            --bg-tertiary: #F5F5F4;
+            --bg-hover: #E7E5E4;
+            --text-primary: #1C1917;
+            --text-secondary: #57534E;
+            --text-muted: #A8A29E;
+            --border-color: rgba(28, 25, 23, 0.1);
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+            --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.1);
         }
 
         body.colorblind-mode .status-unassigned {
-            background: repeating-linear-gradient(45deg, rgba(255,107,107,0.2), rgba(255,107,107,0.2) 4px, rgba(255,107,107,0.4) 4px, rgba(255,107,107,0.4) 8px);
+            background: repeating-linear-gradient(45deg, var(--status-waiting-bg), var(--status-waiting-bg) 4px, transparent 4px, transparent 8px);
         }
 
         body.colorblind-mode .status-assigned {
-            background: repeating-linear-gradient(-45deg, rgba(46,213,115,0.2), rgba(46,213,115,0.2) 4px, rgba(46,213,115,0.4) 4px, rgba(46,213,115,0.4) 8px);
+            background: repeating-linear-gradient(-45deg, var(--status-active-bg), var(--status-active-bg) 4px, transparent 4px, transparent 8px);
         }
 
         body.colorblind-mode .status-badge::before {
@@ -44,93 +82,170 @@
         }
 
         body.colorblind-mode .status-unassigned::before {
-            content: '✗';
+            content: '○ ';
         }
 
         body.colorblind-mode .status-assigned::before {
-            content: '✓';
+            content: '● ';
         }
 
         * {
             box-sizing: border-box;
         }
 
+        html {
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            font-family: var(--font-body);
             background: var(--bg-primary);
             color: var(--text-primary);
             min-height: 100vh;
             margin: 0;
-            padding: 20px;
+            padding: 24px;
             transition: background 0.3s, color 0.3s;
+            position: relative;
+        }
+
+        /* Atmospheric noise texture */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            opacity: 0.025;
+            z-index: 1000;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+        }
+
+        /* Ambient glow */
+        body::after {
+            content: '';
+            position: fixed;
+            top: -40%;
+            right: -20%;
+            width: 70%;
+            height: 70%;
+            background: radial-gradient(ellipse at center, rgba(249, 115, 22, 0.04) 0%, transparent 60%);
+            pointer-events: none;
+            z-index: -1;
         }
 
         .container {
             max-width: 1000px;
             margin: 0 auto;
+            position: relative;
+            z-index: 1;
         }
 
         header {
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: flex-end;
             margin-bottom: 24px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid var(--border-color);
             flex-wrap: wrap;
-            gap: 12px;
+            gap: 16px;
+        }
+
+        .header-brand {
+            flex: 1;
         }
 
         h1 {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: #fff;
-            padding: 12px 20px;
-            border-radius: 8px;
-            font-size: 1.4rem;
+            font-family: var(--font-display);
+            font-size: 1.75rem;
+            font-weight: 400;
+            color: var(--text-primary);
             margin: 0;
+            letter-spacing: -0.02em;
+            background: none;
+            padding: 0;
+        }
+
+        .header-subtitle {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            margin-top: 4px;
         }
 
         .header-links {
             display: flex;
-            gap: 16px;
+            gap: 8px;
             align-items: center;
         }
 
         .header-link {
-            color: #667eea;
+            color: var(--text-secondary);
             text-decoration: none;
-            font-size: 0.9rem;
+            font-size: 0.8125rem;
+            font-weight: 500;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            transition: all 0.2s;
         }
 
         .header-link:hover {
-            text-decoration: underline;
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border-color: var(--text-muted);
+            text-decoration: none;
         }
 
         .summary-bar {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 12px 16px;
-            background: #16213e;
-            border: 1px solid #3d3d5c;
-            border-radius: 8px;
-            margin-bottom: 16px;
+            padding: 16px 20px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            margin-bottom: 24px;
             flex-wrap: wrap;
-            gap: 12px;
+            gap: 16px;
         }
 
         .summary-stats {
             display: flex;
-            gap: 16px;
-            font-size: 0.85rem;
+            gap: 32px;
             flex-wrap: wrap;
             align-items: center;
         }
 
         .summary-stat {
-            color: #a0a0a0;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .summary-stat-label {
+            font-size: 0.6875rem;
+            font-weight: 500;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-muted);
         }
 
         .summary-stat strong {
-            color: #e0e0e0;
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .summary-stat.highlight strong {
+            color: var(--status-active);
+        }
+
+        .summary-stat.highlight .summary-stat-label {
+            color: var(--status-active);
         }
 
         .summary-actions {
@@ -141,28 +256,34 @@
         }
 
         .icon-btn {
-            padding: 6px 12px;
-            background: #3d3d5c;
-            border: none;
-            border-radius: 6px;
-            color: #e0e0e0;
+            padding: 8px 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-secondary);
             cursor: pointer;
             font-size: 0.8rem;
+            font-family: var(--font-body);
+            font-weight: 500;
             transition: all 0.2s;
         }
 
         .icon-btn:hover {
-            background: #4d4d6c;
+            background: var(--bg-hover);
+            color: var(--text-primary);
         }
 
         .icon-btn.active {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--accent-muted);
+            color: var(--accent);
+            border-color: var(--accent);
         }
 
         .monitors {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: 16px;
+            gap: 20px;
+            margin-bottom: 20px;
         }
 
         @media (max-width: 700px) {
@@ -172,13 +293,31 @@
         }
 
         .monitor {
-            border: 2px solid #3d3d5c;
-            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
             padding: 20px;
-            background: #16213e;
+            background: var(--bg-secondary);
             position: relative;
-            transition: all 0.2s;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             cursor: grab;
+            box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+            animation: cardEntrance 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes cardEntrance {
+            from {
+                opacity: 0;
+                transform: translateY(16px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .monitor:hover {
+            border-color: rgba(249, 115, 22, 0.5);
+            box-shadow: var(--shadow-md);
         }
 
         .monitor:active {
@@ -191,16 +330,17 @@
         }
 
         .monitor.drag-over {
-            border-color: #667eea;
-            background: #1a1a3e;
+            border-color: var(--accent);
+            background: var(--bg-tertiary);
         }
 
         .monitor.priority {
-            border-color: #2ed573;
+            border-color: var(--status-active);
+            box-shadow: var(--shadow-md), 0 0 40px var(--status-active-glow);
         }
 
         .monitor.priority.drag-over {
-            border-color: #667eea;
+            border-color: var(--accent);
         }
 
         .monitor-header {
@@ -211,98 +351,119 @@
 
         .monitor-header input {
             flex: 1;
-            padding: 10px 14px;
-            border: 2px solid #3d3d5c;
+            padding: 12px 16px;
+            border: 1px solid var(--border-color);
             border-radius: 8px;
-            background: #1a1a2e;
-            color: #e0e0e0;
-            font-size: 1rem;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 0.9375rem;
+            font-family: var(--font-body);
+            transition: all 0.2s;
+        }
+
+        .monitor-header input::placeholder {
+            color: var(--text-muted);
         }
 
         .monitor-header input:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-muted);
         }
 
         .monitor-header button {
-            padding: 10px 18px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 12px 20px;
+            background: var(--accent);
             color: white;
             border: none;
             border-radius: 8px;
             cursor: pointer;
-            font-size: 0.9rem;
+            font-size: 0.875rem;
             font-weight: 600;
-            transition: opacity 0.2s;
+            font-family: var(--font-body);
+            transition: all 0.2s;
         }
 
         .monitor-header button:hover {
-            opacity: 0.9;
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.25);
+        }
+
+        .monitor-header button:active {
+            transform: translateY(0) scale(0.98);
         }
 
         .monitor-header button:disabled {
             opacity: 0.5;
             cursor: not-allowed;
+            transform: none;
         }
 
         .remove-btn {
             position: absolute;
-            top: 10px;
-            right: 10px;
+            top: 12px;
+            right: 12px;
             width: 24px;
             height: 24px;
             padding: 0;
             background: transparent;
-            border: 1px solid #3d3d5c;
-            border-radius: 4px;
-            color: #666;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            color: var(--text-muted);
             cursor: pointer;
             font-size: 14px;
             line-height: 1;
             display: flex;
             align-items: center;
             justify-content: center;
+            transition: all 0.2s;
         }
 
         .remove-btn:hover {
-            background: #ff6b6b33;
-            border-color: #ff6b6b;
-            color: #ff6b6b;
+            background: rgba(239, 68, 68, 0.12);
+            border-color: var(--danger);
+            color: var(--danger);
         }
 
         .add-monitor-btn {
             width: 100%;
-            padding: 14px;
+            padding: 20px;
             background: transparent;
-            border: 2px dashed #3d3d5c;
-            border-radius: 12px;
-            color: #666;
+            border: 2px dashed var(--border-color);
+            border-radius: 16px;
+            color: var(--text-muted);
             cursor: pointer;
-            font-size: 1rem;
-            transition: all 0.2s;
+            font-size: 0.9375rem;
+            font-family: var(--font-body);
+            font-weight: 500;
+            transition: all 0.3s;
         }
 
         .add-monitor-btn:hover {
-            border-color: #667eea;
-            color: #667eea;
+            border-color: var(--accent);
+            color: var(--accent);
+            background: var(--accent-muted);
         }
 
         .loading {
             text-align: center;
-            padding: 20px;
-            color: #a0a0a0;
+            padding: 24px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
         }
 
         .spinner {
             display: inline-block;
-            width: 18px;
-            height: 18px;
-            border: 3px solid #3d3d5c;
-            border-top-color: #667eea;
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--accent);
             border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-right: 8px;
-            vertical-align: middle;
+            animation: spin 0.8s linear infinite;
         }
 
         @keyframes spin {
@@ -310,139 +471,197 @@
         }
 
         .error {
-            color: #ff6b6b;
+            color: var(--danger);
             text-align: center;
             padding: 16px;
+            font-size: 0.875rem;
         }
 
         .field {
-            margin-bottom: 10px;
-            font-size: 0.95rem;
+            margin-bottom: 12px;
+            font-size: 0.9375rem;
+            display: flex;
+            gap: 8px;
         }
 
         .label {
-            font-weight: 600;
-            color: #a0a0a0;
-            margin-right: 8px;
+            font-size: 0.6875rem;
+            font-weight: 500;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            min-width: 80px;
         }
 
         .value {
-            color: #e0e0e0;
+            color: var(--text-primary);
+            font-weight: 500;
         }
 
         .status {
-            margin-top: 16px;
-            padding-top: 16px;
-            border-top: 1px solid #3d3d5c;
+            margin-top: 20px;
+            padding: 20px;
+            background: var(--bg-tertiary);
+            border-radius: 12px;
             text-align: center;
         }
 
+        .status-led {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin: 0 auto 12px;
+        }
+
         .status-badge {
-            font-size: 1.1rem;
-            font-weight: 700;
-            padding: 6px 14px;
-            border-radius: 6px;
-            display: inline-block;
-            margin-bottom: 6px;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            padding: 0;
+            display: block;
+            margin-bottom: 4px;
+            background: none;
+            border-radius: 0;
         }
 
         .status-unassigned {
-            background: rgba(255, 107, 107, 0.2);
-            color: #ff6b6b;
+            color: var(--status-waiting);
+        }
+
+        .status-unassigned + .status-message::before {
+            content: '';
+            display: block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--status-waiting);
+            box-shadow: 0 0 8px var(--status-waiting), 0 0 20px var(--status-waiting-glow);
+            margin: 0 auto 12px;
         }
 
         .status-assigned {
-            background: rgba(46, 213, 115, 0.2);
-            color: #2ed573;
-            animation: pulse 1s ease-in-out infinite;
+            color: var(--status-active);
         }
 
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+        .status-assigned + .status-message::before {
+            content: '';
+            display: block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--status-active);
+            box-shadow: 0 0 8px var(--status-active), 0 0 30px var(--status-active-glow);
+            margin: 0 auto 12px;
+            animation: breathe 3s ease-in-out infinite;
+        }
+
+        @keyframes breathe {
+            0%, 100% {
+                box-shadow: 0 0 8px var(--status-active), 0 0 30px var(--status-active-glow);
+            }
+            50% {
+                box-shadow: 0 0 12px var(--status-active), 0 0 50px var(--status-active-glow);
+            }
         }
 
         .status-message {
-            color: #a0a0a0;
-            font-size: 0.85rem;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
         }
 
         .duration {
-            color: #ffa502;
-            font-size: 0.85rem;
-            margin-top: 8px;
+            color: var(--status-waiting);
+            font-size: 0.8125rem;
+            margin-top: 12px;
+            font-weight: 500;
         }
 
         .monitor-actions {
             display: flex;
             justify-content: center;
             gap: 8px;
-            margin-top: 12px;
+            margin-top: 16px;
         }
 
         .monitor-action-btn {
-            padding: 4px 10px;
-            background: #3d3d5c;
-            border: none;
-            border-radius: 4px;
-            color: #a0a0a0;
+            padding: 6px 12px;
+            background: transparent;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-secondary);
             cursor: pointer;
             font-size: 0.75rem;
+            font-family: var(--font-body);
+            font-weight: 500;
             transition: all 0.2s;
         }
 
         .monitor-action-btn:hover {
-            background: #4d4d6c;
-            color: #e0e0e0;
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border-color: var(--text-muted);
         }
 
         .history {
-            margin-top: 12px;
-            padding-top: 12px;
-            border-top: 1px solid #3d3d5c;
-            font-size: 0.8rem;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border-color);
+            font-size: 0.8125rem;
         }
 
         .history-title {
-            color: #888;
-            margin-bottom: 6px;
+            font-size: 0.6875rem;
+            font-weight: 500;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 8px;
         }
 
         .history-item {
-            color: #666;
-            padding: 2px 0;
+            color: var(--text-muted);
+            padding: 4px 0;
         }
 
         .history-item.assigned {
-            color: #2ed573;
+            color: var(--status-active);
         }
 
         .history-item.unassigned {
-            color: #ff6b6b;
+            color: var(--status-waiting);
         }
 
         .instructions {
             text-align: center;
-            color: #666;
-            padding: 20px;
+            color: var(--text-muted);
+            padding: 24px;
         }
 
         .instructions a {
-            color: #667eea;
+            color: var(--accent);
         }
 
         select {
-            padding: 4px 8px;
-            border: 1px solid #3d3d5c;
-            border-radius: 4px;
-            background: #16213e;
-            color: #e0e0e0;
-            font-size: 0.85rem;
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            font-size: 0.8125rem;
+            font-family: var(--font-body);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        select:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
         }
 
         select:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: var(--accent);
         }
 
         .hidden {
@@ -473,65 +692,78 @@
 
         .monitor-label {
             width: 100%;
-            padding: 8px 12px;
-            border: 1px solid #3d3d5c;
-            border-radius: 6px;
-            background: #1a1a2e;
-            color: #e0e0e0;
-            font-size: 0.9rem;
-            margin-bottom: 12px;
+            padding: 12px 16px;
+            border: none;
+            border-bottom: 1px solid var(--border-color);
+            border-radius: 0;
+            background: transparent;
+            color: var(--text-primary);
+            font-size: 1rem;
+            font-weight: 600;
+            font-family: var(--font-body);
+            margin-bottom: 16px;
+            padding-left: 0;
         }
 
         .monitor-label:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: var(--accent);
         }
 
         .monitor-label::placeholder {
-            color: #555;
+            color: var(--text-muted);
+            font-weight: 400;
+            font-style: italic;
         }
 
         footer {
-            margin-top: 32px;
-            padding-top: 20px;
-            border-top: 1px solid #3d3d5c;
+            margin-top: 48px;
+            padding-top: 24px;
+            border-top: 1px solid var(--border-color);
             text-align: center;
-            font-size: 0.8rem;
-            color: #555;
+            font-size: 0.8125rem;
+            color: var(--text-muted);
         }
 
         footer a {
-            color: #667eea;
+            color: var(--text-muted);
             text-decoration: none;
+            transition: color 0.2s;
         }
 
         footer a:hover {
-            text-decoration: underline;
+            color: var(--accent);
         }
 
         .built-with {
             margin-top: 8px;
-            color: #444;
+            color: var(--text-muted);
+            opacity: 0.6;
         }
 
         .toast {
             position: fixed;
-            bottom: 20px;
+            bottom: 32px;
             left: 50%;
-            transform: translateX(-50%);
-            background: #2ed573;
-            color: #1a1a2e;
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-size: 0.9rem;
-            font-weight: 600;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            padding: 16px 24px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-lg);
+            font-size: 0.9375rem;
+            font-family: var(--font-body);
+            font-weight: 500;
             opacity: 0;
-            transition: opacity 0.3s;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             pointer-events: none;
+            z-index: 2000;
         }
 
         .toast.show {
             opacity: 1;
+            transform: translateX(-50%) translateY(0);
         }
 
         .update-banner {
@@ -539,12 +771,12 @@
             top: 0;
             left: 0;
             right: 0;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--accent);
             color: white;
             text-align: center;
-            padding: 10px;
-            font-size: 0.9rem;
-            z-index: 1000;
+            padding: 12px;
+            font-size: 0.875rem;
+            z-index: 3000;
         }
 
         .update-banner a {
@@ -553,13 +785,13 @@
         }
 
         .new-domain-banner {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--accent);
             color: white;
             text-align: center;
             padding: 12px 20px;
-            font-size: 0.9rem;
+            font-size: 0.875rem;
             position: relative;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            box-shadow: var(--shadow-md);
         }
 
         .new-domain-banner a {
@@ -583,6 +815,7 @@
             font-size: 1rem;
             line-height: 1;
             padding: 0;
+            transition: background 0.2s;
         }
 
         .new-domain-banner .dismiss:hover {
@@ -603,35 +836,17 @@
             background: var(--danger);
             color: white;
             text-align: center;
-            padding: 10px;
-            font-size: 0.9rem;
-            z-index: 1001;
+            padding: 12px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            z-index: 3001;
         }
 
         .countdown {
             display: inline-flex;
             align-items: center;
             gap: 6px;
-        }
-
-        .countdown-ring {
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            border: 2px solid var(--border-color);
-            border-top-color: var(--accent);
-            animation: countdown-spin 1s linear infinite;
-        }
-
-        @keyframes countdown-spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .toolbar {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 16px;
-            flex-wrap: wrap;
+            font-variant-numeric: tabular-nums;
         }
 
         .file-input {
@@ -639,12 +854,14 @@
         }
 
         .keyboard-hint {
-            font-size: 0.7rem;
+            font-size: 0.75rem;
+            font-family: var(--font-mono);
             color: var(--text-muted);
-            margin-top: 4px;
+            margin-top: 8px;
+            opacity: 0.7;
         }
 
-        /* Changelog Modal */
+        /* Modal */
         .modal-overlay {
             position: fixed;
             top: 0;
@@ -652,48 +869,52 @@
             right: 0;
             bottom: 0;
             background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
             display: flex;
             align-items: center;
             justify-content: center;
             z-index: 2000;
-            padding: 20px;
+            padding: 24px;
         }
 
         .modal {
             background: var(--bg-secondary);
             border: 1px solid var(--border-color);
-            border-radius: 12px;
-            max-width: 600px;
+            border-radius: 16px;
+            max-width: 560px;
             width: 100%;
             max-height: 80vh;
             display: flex;
             flex-direction: column;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            box-shadow: var(--shadow-lg);
         }
 
         .modal-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 16px 20px;
+            padding: 20px;
             border-bottom: 1px solid var(--border-color);
         }
 
         .modal-title {
-            font-size: 1.2rem;
-            font-weight: 600;
+            font-family: var(--font-display);
+            font-size: 1.25rem;
+            font-weight: 400;
             color: var(--text-primary);
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
         }
 
         .modal-version {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--accent);
             color: white;
             padding: 4px 10px;
             border-radius: 20px;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
+            font-family: var(--font-body);
+            font-weight: 600;
         }
 
         .modal-close {
@@ -704,6 +925,7 @@
             cursor: pointer;
             padding: 0;
             line-height: 1;
+            transition: color 0.2s;
         }
 
         .modal-close:hover {
@@ -714,14 +936,15 @@
             padding: 20px;
             overflow-y: auto;
             color: var(--text-secondary);
-            font-size: 0.9rem;
+            font-size: 0.9375rem;
             line-height: 1.6;
         }
 
         .modal-body h2, .modal-body h3, .modal-body h4 {
             color: var(--text-primary);
-            margin-top: 16px;
+            margin-top: 20px;
             margin-bottom: 8px;
+            font-family: var(--font-body);
         }
 
         .modal-body h2:first-child {
@@ -729,12 +952,12 @@
         }
 
         .modal-body ul {
-            margin: 8px 0;
-            padding-left: 20px;
+            margin: 12px 0;
+            padding-left: 24px;
         }
 
         .modal-body li {
-            margin-bottom: 4px;
+            margin-bottom: 8px;
         }
 
         .modal-body strong {
@@ -746,6 +969,7 @@
             padding: 2px 6px;
             border-radius: 4px;
             font-size: 0.85em;
+            font-family: var(--font-mono);
         }
 
         .modal-footer {
@@ -757,21 +981,530 @@
         }
 
         .modal-btn {
-            padding: 8px 20px;
-            border-radius: 6px;
-            font-size: 0.9rem;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-family: var(--font-body);
+            font-weight: 600;
             cursor: pointer;
             border: none;
             transition: all 0.2s;
         }
 
         .modal-btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--accent);
             color: white;
         }
 
         .modal-btn-primary:hover {
-            opacity: 0.9;
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+        }
+
+        /* Address Lookup Styles */
+        .address-lookup-btn {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 600;
+            font-family: var(--font-body);
+            margin-top: 12px;
+            transition: all 0.2s;
+        }
+
+        .address-lookup-btn:hover {
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.25);
+        }
+
+        .instructions-main {
+            margin-bottom: 8px;
+        }
+
+        .address-lookup {
+            margin-top: 16px;
+            padding: 16px;
+            background: var(--bg-tertiary);
+            border-radius: 12px;
+        }
+
+        .address-lookup input[type="text"] {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 0.9375rem;
+            font-family: var(--font-body);
+            margin-bottom: 12px;
+            transition: all 0.2s;
+        }
+
+        .address-lookup input[type="text"]::placeholder {
+            color: var(--text-muted);
+        }
+
+        .address-lookup input[type="text"]:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-muted);
+        }
+
+        .address-lookup-actions {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .address-lookup-actions button {
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 600;
+            font-family: var(--font-body);
+            border: none;
+            transition: all 0.2s;
+        }
+
+        .address-lookup-actions .search-btn {
+            background: var(--accent);
+            color: white;
+        }
+
+        .address-lookup-actions .search-btn:hover {
+            background: var(--accent-hover);
+        }
+
+        .address-lookup-actions .search-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .address-lookup-actions .cancel-btn {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+        }
+
+        .address-lookup-actions .cancel-btn:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .address-loading {
+            text-align: center;
+            padding: 16px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        .address-error {
+            color: var(--danger);
+            padding: 16px;
+            text-align: center;
+            font-size: 0.875rem;
+        }
+
+        .address-results {
+            margin-top: 16px;
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            font-size: 0.875rem;
+        }
+
+        .results-help {
+            color: var(--accent);
+            cursor: pointer;
+            font-size: 0.75rem;
+        }
+
+        .results-help:hover {
+            text-decoration: underline;
+        }
+
+        .address-result {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .address-result:hover {
+            border-color: var(--accent);
+            background: var(--bg-hover);
+        }
+
+        .result-rank {
+            font-size: 0.875rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            width: 28px;
+            text-align: center;
+        }
+
+        .result-details {
+            flex: 1;
+        }
+
+        .result-event {
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 2px;
+        }
+
+        .result-meta {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .result-status {
+            font-size: 0.6875rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin-top: 4px;
+            display: inline-block;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        .result-status.status-assigned {
+            background: var(--status-active-bg);
+            color: var(--status-active);
+        }
+
+        .result-status.status-unassigned {
+            background: var(--status-waiting-bg);
+            color: var(--status-waiting);
+        }
+
+        .result-confidence {
+            font-size: 0.625rem;
+            font-weight: 600;
+            padding: 4px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .result-confidence.best {
+            background: var(--status-active-bg);
+            color: var(--status-active);
+        }
+
+        .result-confidence.good {
+            background: var(--status-waiting-bg);
+            color: var(--status-waiting);
+        }
+
+        .result-confidence.possible {
+            background: var(--accent-muted);
+            color: var(--accent);
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 24px;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .privacy-note {
+            font-size: 0.6875rem;
+            color: var(--text-muted);
+            margin-top: 12px;
+            text-align: center;
+        }
+
+        /* Crews Near Me Section */
+        .crews-nearby {
+            margin-top: 16px;
+            padding: 16px;
+            background: var(--status-active-bg);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 12px;
+        }
+
+        .crews-nearby-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .crews-nearby-icon {
+            font-size: 1.25rem;
+        }
+
+        .crews-nearby-title {
+            font-weight: 600;
+            color: var(--status-active);
+            font-size: 0.9375rem;
+        }
+
+        .crews-nearby-subtitle {
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+
+        .nearby-crew-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            margin-bottom: 6px;
+            font-size: 0.8125rem;
+        }
+
+        .nearby-crew-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .nearby-crew-status {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--status-active);
+            box-shadow: 0 0 6px var(--status-active);
+            animation: breathe 3s ease-in-out infinite;
+        }
+
+        .nearby-crew-details {
+            flex: 1;
+        }
+
+        .nearby-crew-event {
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .nearby-crew-meta {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .nearby-crew-distance {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        /* Crews Map Styles */
+        .crews-map-section {
+            margin-bottom: 24px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .crews-map-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.2s;
+        }
+
+        .crews-map-header:hover {
+            background: var(--bg-hover);
+        }
+
+        .crews-map-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: var(--text-primary);
+        }
+
+        .crews-map-pulse {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--status-active);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.8); }
+        }
+
+        .crews-map-toggle {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .crews-map-toggle-icon {
+            transition: transform 0.2s;
+        }
+
+        .crews-map-section.collapsed .crews-map-toggle-icon {
+            transform: rotate(-90deg);
+        }
+
+        .crews-map-body {
+            position: relative;
+            height: 250px;
+            overflow: hidden;
+            transition: height 0.3s ease;
+        }
+
+        .crews-map-section.collapsed .crews-map-body {
+            height: 0;
+        }
+
+        #crewsMap {
+            width: 100%;
+            height: 100%;
+        }
+
+        .crews-map-legend {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 8px 12px;
+            z-index: 1000;
+            font-size: 0.75rem;
+        }
+
+        .crews-map-legend .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--text-secondary);
+        }
+
+        .crews-map-legend .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .crews-map-legend .legend-dot.active {
+            background: var(--status-active);
+            box-shadow: 0 0 6px var(--status-active);
+        }
+
+        /* Leaflet popup styling */
+        .leaflet-popup-content-wrapper {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(28, 25, 23, 0.4);
+        }
+
+        .leaflet-popup-tip {
+            background: var(--bg-secondary);
+        }
+
+        .leaflet-popup-content {
+            margin: 12px 14px;
+            font-family: var(--font-body);
+            font-size: 0.8125rem;
+        }
+
+        .crew-popup-title {
+            font-family: var(--font-mono);
+            font-weight: 600;
+            color: var(--status-active);
+            margin-bottom: 4px;
+        }
+
+        .crew-popup-customers {
+            color: var(--text-secondary);
+        }
+
+        /* Help Modal Specific */
+        .lookup-help-modal .modal-body ol,
+        .lookup-help-modal .modal-body ul {
+            padding-left: 24px;
+        }
+
+        .lookup-help-modal .modal-body li {
+            margin-bottom: 8px;
+        }
+
+        /* Focus visible for accessibility */
+        :focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        /* Reduced motion */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 600px) {
+            .container {
+                padding: 16px;
+            }
+
+            header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .header-links {
+                width: 100%;
+                flex-wrap: wrap;
+            }
+
+            .summary-bar {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .summary-stats {
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            .summary-actions {
+                width: 100%;
+            }
         }
     </style>
 </head>
@@ -784,19 +1517,34 @@
 
     <div class="container">
         <header>
-            <h1>NES Outage Status Checker</h1>
+            <div class="header-brand">
+                <h1>NES Outage Tracker</h1>
+                <p class="header-subtitle">Monitoring power restoration in Nashville</p>
+            </div>
             <div class="header-links">
                 <a href="all.html" class="header-link">All Outages</a>
-                <a href="how-it-works.html" class="header-link" style="color: #ff6b6b;">How does this work?</a>
-                <a href="https://github.com/NeckBeardPrince/nes-outage-status-checker/blob/main/README.md#finding-your-event-id" target="_blank" class="header-link">How to find Event ID</a>
+                <a href="how-it-works.html" class="header-link">How It Works</a>
             </div>
         </header>
 
         <div class="summary-bar">
             <div class="summary-stats">
-                <span class="summary-stat">Monitors: <strong id="monitorCount">0</strong></span>
-                <span class="summary-stat">Total Affected: <strong id="totalAffected">0</strong></span>
-                <span class="summary-stat">Total Duration: <strong id="totalDuration">-</strong></span>
+                <span class="summary-stat highlight">
+                    <span class="summary-stat-label">Crews Active</span>
+                    <strong id="crewsActive">-</strong>
+                </span>
+                <span class="summary-stat highlight">
+                    <span class="summary-stat-label">Being Restored</span>
+                    <strong id="customersBeingRestored">-</strong>
+                </span>
+                <span class="summary-stat">
+                    <span class="summary-stat-label">My Monitors</span>
+                    <strong id="monitorCount">0</strong>
+                </span>
+                <span class="summary-stat">
+                    <span class="summary-stat-label">Affected</span>
+                    <strong id="totalAffected">0</strong>
+                </span>
                 <span class="summary-stat" id="lastChecked"></span>
                 <span class="summary-stat countdown" id="nextRefresh"></span>
             </div>
@@ -822,6 +1570,28 @@
                 <button class="icon-btn" id="colorblindBtn" onclick="toggleColorblind()" title="Toggle colorblind mode">A11y</button>
             </div>
             <input type="file" id="importFile" class="file-input" accept=".json" onchange="importMonitors(event)">
+        </div>
+
+        <div class="crews-map-section" id="crewsMapSection">
+            <div class="crews-map-header" onclick="toggleCrewsMap()">
+                <div class="crews-map-title">
+                    <span class="crews-map-pulse"></span>
+                    Where Crews Are Working
+                </div>
+                <div class="crews-map-toggle">
+                    <span id="crewsMapCount">0 crews</span>
+                    <span class="crews-map-toggle-icon">&#9660;</span>
+                </div>
+            </div>
+            <div class="crews-map-body" id="crewsMapBody">
+                <div id="crewsMap"></div>
+                <div class="crews-map-legend">
+                    <div class="legend-item">
+                        <span class="legend-dot active"></span>
+                        <span>Crew Active</span>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="monitors" id="monitors"></div>
@@ -869,6 +1639,40 @@
         </div>
     </div>
 
+    <div class="modal-overlay hidden" id="lookupHelpModal" onclick="closeLookupHelp(event)">
+        <div class="modal lookup-help-modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title">How Address Lookup Works</div>
+                <button class="modal-close" onclick="closeLookupHelp()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>We convert your address to coordinates, then find nearby outage events using a weighted algorithm that considers both distance and outage size.</p>
+
+                <h4>The Process</h4>
+                <ol>
+                    <li><strong>Geocoding:</strong> Convert your address to GPS coordinates using OpenStreetMap</li>
+                    <li><strong>Distance calculation:</strong> Find all outages within 0.6 miles of your location</li>
+                    <li><strong>Smart ranking:</strong> Weight by both distance AND outage size (larger outages affecting more customers cover wider areas)</li>
+                </ol>
+
+                <h4>Why might it be wrong?</h4>
+                <ul>
+                    <li>Two neighbors can be on different electrical equipment and have different outages</li>
+                    <li>Outage boundaries don't follow street lines</li>
+                    <li>Multiple small outages may be near you</li>
+                </ul>
+
+                <h4>Accuracy</h4>
+                <p>~85-95% for the top suggestion. We show you the top 3 matches so you can confirm which one is yours.</p>
+
+                <p><strong>Tip:</strong> If the top result doesn't match what you see on the NES map, try #2 or #3, or verify on the <a href="https://nespower.com/outages" target="_blank">NES Outage Map</a>.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn modal-btn-primary" onclick="closeLookupHelp()">Got it!</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const API_URL = 'https://utilisocial.io/datacapable/v2/p/NES/map/events';
         const STORAGE_KEY = 'nes-outage-monitors';
@@ -884,6 +1688,21 @@
         let colorblindMode = false;
         let monitorId = 0;
         let monitors = {};
+
+        // Activity feed state
+        let previousAllEventsState = {}; // Store previous state of all events for change detection
+        let crewsMapCollapsed = false;
+        const CREWS_MAP_KEY = 'nes-crews-map-collapsed';
+        let crewsMap = null;
+        let crewsMapMarkers = [];
+
+        // Dashboard stats
+        let systemStats = {
+            crewsActive: 0,
+            customersBeingRestored: 0,
+            totalOutages: 0,
+            totalCustomersAffected: 0
+        };
 
         // Audio context for notification sound
         let audioContext = null;
@@ -973,6 +1792,17 @@
             document.getElementById('themeBtn').textContent = lightMode ? 'Dark' : 'Light';
             document.getElementById('themeBtn').classList.toggle('active', lightMode);
             saveSettings();
+
+            // Update map tiles for theme
+            if (crewsMap) {
+                crewsMap.eachLayer(layer => {
+                    if (layer instanceof L.TileLayer) crewsMap.removeLayer(layer);
+                });
+                const tileUrl = lightMode
+                    ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+                    : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+                L.tileLayer(tileUrl, { maxZoom: 19 }).addTo(crewsMap);
+            }
         }
 
         function toggleColorblind() {
@@ -1060,13 +1890,238 @@
         function updateTotalDuration() {
             const activeMonitors = Object.values(monitors).filter(m => m.startTime);
             if (activeMonitors.length === 0) {
-                document.getElementById('totalDuration').textContent = '-';
                 return;
             }
             const totalMs = activeMonitors.reduce((sum, m) => sum + (Date.now() - m.startTime), 0);
             const hours = Math.floor(totalMs / (1000 * 60 * 60));
             const minutes = Math.floor((totalMs % (1000 * 60 * 60)) / (1000 * 60));
-            document.getElementById('totalDuration').textContent = `${hours}h ${minutes}m`;
+        }
+
+        // Activity Feed Functions
+        function toggleCrewsMap() {
+            const section = document.getElementById('crewsMapSection');
+            crewsMapCollapsed = !crewsMapCollapsed;
+            section.classList.toggle('collapsed', crewsMapCollapsed);
+            localStorage.setItem(CREWS_MAP_KEY, crewsMapCollapsed);
+
+            // Invalidate map size when expanding (Leaflet needs this)
+            if (!crewsMapCollapsed && crewsMap) {
+                setTimeout(() => crewsMap.invalidateSize(), 300);
+            }
+        }
+
+        function loadCrewsMapState() {
+            crewsMapCollapsed = localStorage.getItem(CREWS_MAP_KEY) === 'true';
+            const section = document.getElementById('crewsMapSection');
+            if (section && crewsMapCollapsed) {
+                section.classList.add('collapsed');
+            }
+        }
+
+        function initCrewsMap() {
+            // Nashville center coordinates
+            crewsMap = L.map('crewsMap', {
+                zoomControl: true,
+                attributionControl: false
+            }).setView([36.1627, -86.7816], 10);
+
+            // Use appropriate tiles for current theme
+            const tileUrl = lightMode
+                ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+                : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+            L.tileLayer(tileUrl, { maxZoom: 19 }).addTo(crewsMap);
+        }
+
+        function updateCrewsMap(events) {
+            if (!crewsMap) return;
+
+            // Clear existing markers
+            crewsMapMarkers.forEach(marker => crewsMap.removeLayer(marker));
+            crewsMapMarkers = [];
+
+            // Filter to only assigned events with coordinates
+            const assignedEvents = events.filter(e =>
+                e.status !== 'Unassigned' && e.latitude && e.longitude
+            );
+
+            // Update count
+            document.getElementById('crewsMapCount').textContent =
+                `${assignedEvents.length} crew${assignedEvents.length !== 1 ? 's' : ''}`;
+
+            // Add markers for assigned events
+            assignedEvents.forEach(event => {
+                // Size based on customers affected
+                const radius = Math.min(Math.max(Math.sqrt(event.numPeople) * 0.8, 6), 25);
+
+                const marker = L.circleMarker([event.latitude, event.longitude], {
+                    radius: radius,
+                    fillColor: '#10B981',
+                    color: '#059669',
+                    weight: 2,
+                    opacity: 1,
+                    fillOpacity: 0.7
+                }).addTo(crewsMap);
+
+                marker.bindPopup(`
+                    <div class="crew-popup-title">Event ${event.id}</div>
+                    <div class="crew-popup-customers">${event.numPeople.toLocaleString()} customers</div>
+                `);
+
+                crewsMapMarkers.push(marker);
+            });
+
+            // Fit bounds if we have markers
+            if (crewsMapMarkers.length > 0) {
+                const group = L.featureGroup(crewsMapMarkers);
+                crewsMap.fitBounds(group.getBounds().pad(0.1));
+            }
+        }
+
+        // Keep detectActivityChanges for monitor notifications (simplified)
+        function detectActivityChanges(currentEvents) {
+            const changes = [];
+            const currentEventMap = {};
+
+            // Build map of current events
+            currentEvents.forEach(event => {
+                currentEventMap[event.id] = event;
+            });
+
+            // Check for status changes and resolved events
+            Object.entries(previousAllEventsState).forEach(([eventId, prevEvent]) => {
+                const currentEvent = currentEventMap[eventId];
+
+                if (!currentEvent) {
+                    changes.push({
+                        type: 'resolved',
+                        eventId: parseInt(eventId),
+                        customers: prevEvent.numPeople
+                    });
+                } else if (prevEvent.status === 'Unassigned' && currentEvent.status !== 'Unassigned') {
+                    changes.push({
+                        type: 'assigned',
+                        eventId: parseInt(eventId),
+                        customers: currentEvent.numPeople,
+                        status: currentEvent.status
+                    });
+                }
+            });
+
+            // Check for new events (only if we have previous state)
+            if (Object.keys(previousAllEventsState).length > 0) {
+                currentEvents.forEach(event => {
+                    if (!previousAllEventsState[event.id]) {
+                        changes.push({
+                            type: 'new',
+                            eventId: event.id,
+                            customers: event.numPeople
+                        });
+                    }
+                });
+            }
+
+            // Update previous state
+            previousAllEventsState = {};
+            currentEvents.forEach(event => {
+                previousAllEventsState[event.id] = {
+                    status: event.status,
+                    numPeople: event.numPeople
+                };
+            });
+
+            return changes;
+        }
+
+        function updateDashboardStats(events) {
+            // Calculate system-wide stats
+            const assignedEvents = events.filter(e => e.status !== 'Unassigned');
+            const customersBeingRestored = assignedEvents.reduce((sum, e) => sum + e.numPeople, 0);
+            const totalAffected = events.reduce((sum, e) => sum + e.numPeople, 0);
+
+            systemStats = {
+                crewsActive: assignedEvents.length,
+                customersBeingRestored: customersBeingRestored,
+                totalOutages: events.length,
+                totalCustomersAffected: totalAffected
+            };
+
+            // Update dashboard
+            document.getElementById('crewsActive').textContent = systemStats.crewsActive.toLocaleString();
+            document.getElementById('customersBeingRestored').textContent = systemStats.customersBeingRestored.toLocaleString();
+        }
+
+        async function fetchAllEventsAndUpdateDashboard() {
+            try {
+                const response = await fetch(API_URL);
+                if (!response.ok) return;
+
+                const events = await response.json();
+
+                // Update dashboard stats
+                updateDashboardStats(events);
+
+                // Update crews map
+                updateCrewsMap(events);
+
+                // Track state for change detection (used by monitor notifications)
+                detectActivityChanges(events);
+
+            } catch (err) {
+                console.log('Failed to fetch all events:', err);
+            }
+        }
+
+        // Find crews working within a certain radius
+        function findNearbyCrews(lat, lon, events, radiusMiles = 1) {
+            const results = [];
+
+            for (const event of events) {
+                // Only include assigned events (crews working)
+                if (event.status === 'Unassigned') continue;
+
+                if (event.latitude && event.longitude) {
+                    const distance = haversine(lat, lon, event.latitude, event.longitude);
+                    if (distance <= radiusMiles) {
+                        results.push({
+                            event,
+                            distance
+                        });
+                    }
+                }
+            }
+
+            // Sort by distance
+            results.sort((a, b) => a.distance - b.distance);
+
+            return results;
+        }
+
+        function displayNearbyCrews(monitorId, crews, userLat, userLon) {
+            const container = document.getElementById(`crewsNearby-${monitorId}`);
+            const titleEl = document.getElementById(`crewsNearbyTitle-${monitorId}`);
+            const listEl = document.getElementById(`crewsNearbyList-${monitorId}`);
+
+            if (crews.length === 0) {
+                container.classList.add('hidden');
+                return;
+            }
+
+            container.classList.remove('hidden');
+            titleEl.textContent = `${crews.length} crew${crews.length !== 1 ? 's' : ''} working within 1 mile`;
+
+            listEl.innerHTML = crews.map(c => {
+                const distanceStr = c.distance < 0.1 ? '< 0.1' : c.distance.toFixed(2);
+                return `
+                    <div class="nearby-crew-item">
+                        <div class="nearby-crew-status"></div>
+                        <div class="nearby-crew-details">
+                            <div class="nearby-crew-event">Event ${c.event.id}</div>
+                            <div class="nearby-crew-meta">${c.event.numPeople} customers &bull; ${c.event.status}</div>
+                        </div>
+                        <div class="nearby-crew-distance">${distanceStr} mi</div>
+                    </div>
+                `;
+            }).join('');
         }
 
         // Offline detection
@@ -1113,7 +2168,41 @@
                         <button onclick="checkSingleMonitor(${id})">Check</button>
                     </div>
                     <div class="instructions" id="instructions-${id}">
-                        Find your Event ID on the <a href="https://www.nespower.com/outages/" target="_blank">NES Outage Map</a>
+                        <div class="instructions-main">
+                            Know your Event ID? Enter it above. Or:
+                        </div>
+                        <button class="address-lookup-btn" onclick="showAddressLookup(${id})">
+                            Find by Address
+                        </button>
+                    </div>
+                    <div class="address-lookup hidden" id="addressLookup-${id}">
+                        <input type="text" id="addressInput-${id}"
+                               placeholder="Enter address (e.g., 123 Main St Nashville TN)"
+                               onkeypress="handleAddressKeypress(event, ${id})">
+                        <div class="address-lookup-actions">
+                            <button class="search-btn" onclick="lookupAddress(${id})" id="searchBtn-${id}">Search</button>
+                            <button class="cancel-btn" onclick="hideAddressLookup(${id})">Cancel</button>
+                        </div>
+                        <div class="address-loading hidden" id="addressLoading-${id}">
+                            <span class="spinner"></span> Searching for nearby outages...
+                        </div>
+                        <div class="address-error hidden" id="addressError-${id}"></div>
+                        <div class="address-results hidden" id="addressResults-${id}">
+                            <div class="results-header">
+                                <strong>Outages near your address:</strong>
+                                <span class="results-help" onclick="showLookupHelp()">How does this work?</span>
+                            </div>
+                            <div id="addressResultsList-${id}"></div>
+                            <div class="crews-nearby hidden" id="crewsNearby-${id}">
+                                <div class="crews-nearby-header">
+                                    <span class="crews-nearby-icon">&#128679;</span>
+                                    <span class="crews-nearby-title" id="crewsNearbyTitle-${id}">Crews working nearby</span>
+                                </div>
+                                <div class="crews-nearby-subtitle">Even if your outage isn't assigned yet, help is in your area!</div>
+                                <div id="crewsNearbyList-${id}"></div>
+                            </div>
+                        </div>
+                        <div class="privacy-note">Your address is sent to OpenStreetMap for geocoding only</div>
                     </div>
                     <div class="loading hidden" id="loading-${id}">
                         <span class="spinner"></span> Fetching...
@@ -1229,6 +2318,212 @@
 
         function handleKeypress(e, id) {
             if (e.key === 'Enter') checkSingleMonitor(id);
+        }
+
+        function handleAddressKeypress(e, id) {
+            if (e.key === 'Enter') lookupAddress(id);
+        }
+
+        // Address Lookup Functions
+        function showAddressLookup(id) {
+            document.getElementById(`instructions-${id}`).classList.add('hidden');
+            document.getElementById(`addressLookup-${id}`).classList.remove('hidden');
+            document.getElementById(`addressInput-${id}`).focus();
+        }
+
+        function hideAddressLookup(id) {
+            document.getElementById(`addressLookup-${id}`).classList.add('hidden');
+            document.getElementById(`instructions-${id}`).classList.remove('hidden');
+            document.getElementById(`addressError-${id}`).classList.add('hidden');
+            document.getElementById(`addressResults-${id}`).classList.add('hidden');
+            document.getElementById(`addressLoading-${id}`).classList.add('hidden');
+            document.getElementById(`crewsNearby-${id}`).classList.add('hidden');
+        }
+
+        function showLookupHelp() {
+            document.getElementById('lookupHelpModal').classList.remove('hidden');
+        }
+
+        function closeLookupHelp(event) {
+            if (event && event.target !== event.currentTarget) return;
+            document.getElementById('lookupHelpModal').classList.add('hidden');
+        }
+
+        // Haversine distance formula - returns distance in miles
+        function haversine(lat1, lon1, lat2, lon2) {
+            const R = 3959; // Earth radius in miles
+            const dLat = toRad(lat2 - lat1);
+            const dLon = toRad(lon2 - lon1);
+            const a = Math.sin(dLat / 2) ** 2 +
+                      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+            return R * 2 * Math.asin(Math.sqrt(a));
+        }
+
+        function toRad(deg) {
+            return deg * (Math.PI / 180);
+        }
+
+        // Weighted score: lower = better match
+        // Balances distance with customer count (larger outages have larger radius)
+        function calculateScore(distance, numPeople) {
+            const customerWeight = 1 / Math.log(numPeople + 2);
+            return distance * customerWeight;
+        }
+
+        async function geocodeAddress(address) {
+            const encodedAddress = encodeURIComponent(address);
+            const url = `https://nominatim.openstreetmap.org/search?q=${encodedAddress}&format=json&limit=1`;
+
+            const response = await fetch(url, {
+                headers: {
+                    'User-Agent': 'NES-Outage-Checker/1.0 (https://nes-outage-checker.com)'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Geocoding service unavailable');
+            }
+
+            const data = await response.json();
+            if (!data || data.length === 0) {
+                throw new Error('Address not found. Try including city and state.');
+            }
+
+            return {
+                lat: parseFloat(data[0].lat),
+                lon: parseFloat(data[0].lon),
+                displayName: data[0].display_name
+            };
+        }
+
+        function findNearbyOutages(lat, lon, events) {
+            const MAX_DISTANCE = 0.6; // miles
+            const results = [];
+
+            for (const event of events) {
+                // Events have latitude/longitude in their data
+                if (event.latitude && event.longitude) {
+                    const distance = haversine(lat, lon, event.latitude, event.longitude);
+                    if (distance <= MAX_DISTANCE) {
+                        const score = calculateScore(distance, event.numPeople);
+                        results.push({
+                            event,
+                            distance,
+                            score
+                        });
+                    }
+                }
+            }
+
+            // Sort by score (lower is better)
+            results.sort((a, b) => a.score - b.score);
+
+            // Return top 3
+            return results.slice(0, 3);
+        }
+
+        function displayAddressResults(id, results) {
+            const resultsContainer = document.getElementById(`addressResultsList-${id}`);
+            const resultsSection = document.getElementById(`addressResults-${id}`);
+
+            if (results.length === 0) {
+                resultsContainer.innerHTML = `
+                    <div class="no-results">
+                        No outages found within 0.6 miles of your address.
+                        <br><br>
+                        This could mean:
+                        <ul style="text-align: left; margin-top: 8px;">
+                            <li>You don't have an outage in your area</li>
+                            <li>The address wasn't geocoded accurately</li>
+                            <li>The outage data hasn't been updated yet</li>
+                        </ul>
+                    </div>
+                `;
+                resultsSection.classList.remove('hidden');
+                return;
+            }
+
+            const confidenceLabels = ['Best Match', 'Good Match', 'Possible'];
+            const confidenceClasses = ['best', 'good', 'possible'];
+
+            resultsContainer.innerHTML = results.map((r, index) => {
+                const statusClass = r.event.status === 'Unassigned' ? 'status-unassigned' : 'status-assigned';
+                const statusText = r.event.status === 'Unassigned' ? 'Unassigned' : r.event.status;
+                const distanceStr = r.distance < 0.1 ? '< 0.1' : r.distance.toFixed(2);
+
+                return `
+                    <div class="address-result" onclick="selectEvent(${id}, ${r.event.id})">
+                        <div class="result-rank">#${index + 1}</div>
+                        <div class="result-details">
+                            <div class="result-event">Event ${r.event.id}</div>
+                            <div class="result-meta">${r.event.numPeople} customers · ${distanceStr} mi away</div>
+                            <div class="result-status ${statusClass}">${statusText}</div>
+                        </div>
+                        <div class="result-confidence ${confidenceClasses[index]}">${confidenceLabels[index]}</div>
+                    </div>
+                `;
+            }).join('');
+
+            resultsSection.classList.remove('hidden');
+        }
+
+        async function lookupAddress(id) {
+            const addressInput = document.getElementById(`addressInput-${id}`);
+            const address = addressInput.value.trim();
+
+            if (!address) {
+                document.getElementById(`addressError-${id}`).textContent = 'Please enter an address';
+                document.getElementById(`addressError-${id}`).classList.remove('hidden');
+                return;
+            }
+
+            // Show loading, hide errors/results
+            document.getElementById(`addressLoading-${id}`).classList.remove('hidden');
+            document.getElementById(`addressError-${id}`).classList.add('hidden');
+            document.getElementById(`addressResults-${id}`).classList.add('hidden');
+            document.getElementById(`crewsNearby-${id}`).classList.add('hidden');
+            document.getElementById(`searchBtn-${id}`).disabled = true;
+
+            try {
+                // Step 1: Geocode the address
+                const location = await geocodeAddress(address);
+
+                // Step 2: Fetch current outages
+                const response = await fetch(API_URL);
+                if (!response.ok) throw new Error('Failed to fetch outage data');
+                const events = await response.json();
+
+                // Step 3: Find nearby outages (for user's potential outage)
+                const results = findNearbyOutages(location.lat, location.lon, events);
+
+                // Step 4: Find nearby crews (within 1 mile)
+                const nearbyCrews = findNearbyCrews(location.lat, location.lon, events, 1);
+
+                // Step 5: Display results
+                document.getElementById(`addressLoading-${id}`).classList.add('hidden');
+                displayAddressResults(id, results);
+
+                // Step 6: Display nearby crews (gives hope even if their outage isn't assigned)
+                displayNearbyCrews(id, nearbyCrews, location.lat, location.lon);
+
+            } catch (err) {
+                document.getElementById(`addressLoading-${id}`).classList.add('hidden');
+                document.getElementById(`addressError-${id}`).textContent = err.message;
+                document.getElementById(`addressError-${id}`).classList.remove('hidden');
+            } finally {
+                document.getElementById(`searchBtn-${id}`).disabled = false;
+            }
+        }
+
+        function selectEvent(monitorId, eventId) {
+            // Set the event ID in the input
+            document.getElementById(`eventId-${monitorId}`).value = eventId;
+
+            // Hide the address lookup
+            document.getElementById(`addressLookup-${monitorId}`).classList.add('hidden');
+
+            // Check the monitor
+            checkSingleMonitor(monitorId);
         }
 
         // Drag and drop functionality
@@ -1507,6 +2802,12 @@
                 if (!response.ok) throw new Error('Failed to fetch outage data');
 
                 const events = await response.json();
+
+                // Update dashboard stats and crews map
+                updateDashboardStats(events);
+                updateCrewsMap(events);
+                detectActivityChanges(events);
+
                 const event = events.find(e => e.id === eventId);
 
                 if (!event) {
@@ -1529,7 +2830,6 @@
 
         async function refreshAllMonitors() {
             const activeMonitors = Object.entries(monitors).filter(([_, m]) => m.eventId !== null);
-            if (activeMonitors.length === 0) return;
 
             activeMonitors.forEach(([id]) => showLoading(id));
 
@@ -1539,6 +2839,12 @@
 
                 const events = await response.json();
 
+                // Update dashboard stats and crews map
+                updateDashboardStats(events);
+                updateCrewsMap(events);
+                detectActivityChanges(events);
+
+                // Update monitored events
                 activeMonitors.forEach(([id, monitor]) => {
                     const event = events.find(e => e.id === monitor.eventId);
                     if (event) {
@@ -1661,7 +2967,7 @@
         }
 
         // Version check
-        const APP_VERSION = '1.4.0';
+        const APP_VERSION = '1.5.0';
         const SEEN_VERSION_KEY = 'nes-outage-seen-version';
 
         function parseChangelog(markdown, version) {
@@ -1802,7 +3108,12 @@
         // Initialize
         (function init() {
             loadSettings();
+            loadCrewsMapState();
+            initCrewsMap();
             updateOnlineStatus();
+
+            // Fetch initial dashboard data and crews map
+            fetchAllEventsAndUpdateDashboard();
 
             const params = new URLSearchParams(window.location.search);
             const monitorsParam = params.get('monitors');
