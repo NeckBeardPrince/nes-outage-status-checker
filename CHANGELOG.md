@@ -2,6 +2,23 @@
 
 All notable changes to the NES Outage Status Checker will be documented in this file.
 
+## [1.8.0] - 2026-01-30
+
+### Added
+
+#### Web App - Both Pages
+- **Data Freshness indicator** - Shows timestamp of last API check and change summary (+X new, -X resolved, X status changes) highlighted when changes occur
+
+#### Web App - Monitor Page
+- **System-wide stats in header** - Added Total Outages, Waiting for Crew, and Affected Customers counts to match the All Outages page
+- **My Monitors section header** - New section header showing monitor count and total affected customers for tracked events
+
+#### Web App - All Outages Page
+- **Sort by Recently Updated** - New sort option to order outages by most recently updated first
+- **View on Map modal** - Click "View on Map" on any outage card to open a modal with a larger map showing the outage location, with status-colored border (green for assigned, amber for unassigned) and reverse geocoding to display a human-readable address
+
+---
+
 ## [1.7.0] - 2026-01-30
 
 *Thank you to [jjstafford](https://github.com/jjstafford) for [PR #6](https://github.com/NeckBeardPrince/nes-outage-status-checker/pull/6)!*
