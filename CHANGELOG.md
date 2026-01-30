@@ -2,6 +2,17 @@
 
 All notable changes to the NES Outage Status Checker will be documented in this file.
 
+## [1.10.0] - 2026-01-30
+
+*Thank you to [nico22nguyen](https://github.com/nico22nguyen) for [PR #8](https://github.com/NeckBeardPrince/nes-outage-status-checker/pull/8)!*
+
+### Changed
+
+#### Web App - All Outages Page
+- **Optimized API interactions** - Filter and sort changes no longer trigger API calls, using cached data instead for faster response on cellular connections
+
+---
+
 ## [1.9.0] - 2026-01-30
 
 ### Added
