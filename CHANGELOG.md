@@ -4,6 +4,8 @@ All notable changes to the NES Outage Status Checker will be documented in this 
 
 ## [1.5.0] - 2026-01-29
 
+*Thank you to [coleman8er](https://github.com/coleman8er) for [PR #3](https://github.com/NeckBeardPrince/nes-outage-status-checker/pull/3) and the new features below!*
+
 ### Added
 
 #### Web App - Monitor Page
@@ -12,6 +14,10 @@ All notable changes to the NES Outage Status Checker will be documented in this 
 - **Top 3 matches** - Shows the 3 best matches with confidence indicators (Best Match, Good Match, Possible)
 - **Help modal** - Explains how the address lookup works and why it might occasionally suggest the wrong event
 - **Privacy-focused** - Address is sent to OpenStreetMap for geocoding only, no data stored
+- **Crews Near Me map** - View NES crews working near your monitored outages
+
+### Changed
+- **"Calm Utility" UI refresh** - New warm charcoal color palette, refined typography with DM Serif Display + Outfit fonts, subtle animations and ambient visual effects
 
 ---
 
