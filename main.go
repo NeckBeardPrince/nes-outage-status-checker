@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -28,6 +29,11 @@ type OutageEvent struct {
 	Longitude       float64 `json:"longitude"`
 }
 
+type dataPoint struct {
+	Timestamp time.Time
+	NumPeople int
+}
+
 type model struct {
 	eventID      int
 	event        *OutageEvent
@@ -37,6 +43,8 @@ type model struct {
 	lastChecked  time.Time
 	blinkOn      bool
 	statusBlink  bool
+	showChart    bool
+	history      []dataPoint
 }
 
 type tickMsg time.Time
@@ -86,6 +94,9 @@ var (
 	timeStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("245")).
 			Italic(true)
+
+	chartStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("46"))
 )
 
 func initialModel(eventID int) model {
@@ -98,6 +109,8 @@ func initialModel(eventID int) model {
 		loading:     true,
 		blinkOn:     true,
 		statusBlink: false,
+		showChart:   false,
+		history:     make([]dataPoint, 0),
 	}
 }
 
@@ -155,6 +168,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "r":
 			m.loading = true
 			return m, fetchEvent(m.eventID)
+		case "c":
+			m.showChart = !m.showChart
+			return m, nil
 		}
 
 	case tickMsg:
@@ -175,6 +191,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = nil
 			m.event = msg.event
 			m.statusBlink = (m.event.Status != "Unassigned")
+			// Add data point to history
+			if m.event != nil {
+				m.history = append(m.history, dataPoint{
+					Timestamp: time.Now(),
+					NumPeople: m.event.NumPeople,
+				})
+				// Keep only last 50 data points
+				if len(m.history) > 50 {
+					m.history = m.history[len(m.history)-50:]
+				}
+			}
 		}
 		return m, nil
 
@@ -187,13 +214,187 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func renderChart(history []dataPoint, width, height int) string {
+	if len(history) < 2 {
+		return "Not enough data points yet. Wait for a few refreshes."
+	}
+
+	// Work with a copy to avoid modifying original
+	displayHistory := history
+	points := len(displayHistory)
+	dataWidth := width - 8 // Leave space for Y-axis labels
+	if dataWidth < 1 {
+		dataWidth = 1
+	}
+	if points > dataWidth {
+		displayHistory = displayHistory[len(displayHistory)-dataWidth:]
+		points = len(displayHistory)
+	}
+
+	// Find min and max values
+	minPeople := displayHistory[0].NumPeople
+	maxPeople := displayHistory[0].NumPeople
+	for _, point := range displayHistory {
+		if point.NumPeople < minPeople {
+			minPeople = point.NumPeople
+		}
+		if point.NumPeople > maxPeople {
+			maxPeople = point.NumPeople
+		}
+	}
+
+	// Add some padding
+	rangePeople := maxPeople - minPeople
+	if rangePeople == 0 {
+		rangePeople = 1
+	}
+	padding := rangePeople / 10
+	if padding == 0 {
+		padding = 1
+	}
+	minPeople -= padding
+	maxPeople += padding
+	rangePeople = maxPeople - minPeople
+
+	// Create chart grid
+	dataHeight := height - 2 // Leave space for X-axis labels
+	if dataHeight < 1 {
+		dataHeight = 1
+	}
+	chart := make([][]rune, height)
+	for i := range chart {
+		chart[i] = make([]rune, width)
+		for j := range chart[i] {
+			chart[i][j] = ' '
+		}
+	}
+
+	// Draw axes
+	// Y-axis (left)
+	for i := 0; i < height; i++ {
+		chart[i][0] = '│'
+	}
+	// X-axis (bottom)
+	for j := 0; j < width; j++ {
+		chart[height-1][j] = '─'
+	}
+	// Corner
+	chart[height-1][0] = '└'
+
+	// Plot data points
+	for i := 0; i < points-1; i++ {
+		x1 := 1 + (i * dataWidth / points)
+		x2 := 1 + ((i + 1) * dataWidth / points)
+		y1 := dataHeight - 1 - int(float64(displayHistory[i].NumPeople-minPeople)*float64(dataHeight-1)/float64(rangePeople))
+		y2 := dataHeight - 1 - int(float64(displayHistory[i+1].NumPeople-minPeople)*float64(dataHeight-1)/float64(rangePeople))
+
+		// Draw line using Bresenham's algorithm
+		dx := x2 - x1
+		dy := y2 - y1
+		absDx := dx
+		if absDx < 0 {
+			absDx = -absDx
+		}
+		absDy := dy
+		if absDy < 0 {
+			absDy = -absDy
+		}
+		sx := 1
+		if x1 > x2 {
+			sx = -1
+		}
+		sy := 1
+		if y1 > y2 {
+			sy = -1
+		}
+		err := absDx - absDy
+
+		x, y := x1, y1
+		for {
+			if x >= 1 && x < width-7 && y >= 0 && y < dataHeight {
+				chart[y][x] = '●'
+			}
+			if x == x2 && y == y2 {
+				break
+			}
+			e2 := 2 * err
+			if e2 > -absDy {
+				err -= absDy
+				x += sx
+			}
+			if e2 < absDx {
+				err += absDx
+				y += sy
+			}
+		}
+	}
+
+	// Add Y-axis labels
+	labelY := []int{0, dataHeight / 2, dataHeight - 1}
+	for _, y := range labelY {
+		value := maxPeople - int(float64(y)*float64(rangePeople)/float64(dataHeight-1))
+		label := fmt.Sprintf("%d", value)
+		if len(label) <= 6 {
+			for i, r := range label {
+				if y < height && 1+i < width {
+					chart[y][1+i] = r
+				}
+			}
+		}
+	}
+
+	// Build chart string
+	var result strings.Builder
+	result.WriteString("\n")
+	for i := 0; i < height; i++ {
+		result.WriteString(string(chart[i]))
+		result.WriteString("\n")
+	}
+
+	// Add X-axis time labels
+	result.WriteString("      ")
+	labelCount := 3
+	if points < labelCount {
+		labelCount = points
+	}
+	if labelCount > 1 {
+		for i := 0; i < labelCount; i++ {
+			idx := i * (points - 1) / (labelCount - 1)
+			if idx >= len(displayHistory) {
+				idx = len(displayHistory) - 1
+			}
+			timeStr := displayHistory[idx].Timestamp.Format("3:04 PM")
+			result.WriteString(fmt.Sprintf("%-12s", timeStr))
+		}
+	} else if points == 1 {
+		timeStr := displayHistory[0].Timestamp.Format("3:04 PM")
+		result.WriteString(timeStr)
+	}
+	result.WriteString("\n")
+
+	return result.String()
+}
+
 func (m model) View() string {
 	var s string
 
 	s += "\n"
 	s += titleStyle.Render("NES Outage Status Checker") + "\n\n"
 
-	if m.loading && m.event == nil {
+	if m.showChart && len(m.history) > 0 {
+		// Chart view
+		chartContent := labelStyle.Render("Affected Customers Over Time") + "\n"
+		chartContent += valueStyle.Render(fmt.Sprintf("Event ID: %d", m.eventID)) + "\n\n"
+		
+		// Get terminal size for chart dimensions
+		chartContent += renderChart(m.history, 60, 15)
+		
+		s += boxStyle.Render(chartContent) + "\n"
+		
+		if m.loading {
+			s += "\n" + m.spinner.View() + " Refreshing..."
+		}
+	} else if m.loading && m.event == nil {
 		s += m.spinner.View() + " Fetching outage data...\n"
 	} else if m.err != nil {
 		s += errorStyle.Render("Error: "+m.err.Error()) + "\n"
@@ -243,7 +444,15 @@ func (m model) View() string {
 	if !m.lastChecked.IsZero() {
 		s += timeStyle.Render(fmt.Sprintf("Last checked: %s", m.lastChecked.Format("3:04:05 PM"))) + "\n"
 	}
-	s += helpStyle.Render("Press 'r' to refresh • 'q' to quit • Auto-refreshes every 30s") + "\n"
+	
+	helpText := "Press 'r' to refresh • 'q' to quit"
+	if m.showChart {
+		helpText += " • 'c' to view details"
+	} else {
+		helpText += " • 'c' to view chart"
+	}
+	helpText += " • Auto-refreshes every 30s"
+	s += helpStyle.Render(helpText) + "\n"
 
 	return s
 }
