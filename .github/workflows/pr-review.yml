@@ -1,0 +1,97 @@
+name: Claude PR Review
+
+on:
+  pull_request:
+    types: [opened, ready_for_review, synchronize]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Get PR information
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Get PR diff
+          gh pr diff ${{ github.event.pull_request.number }} > pr_diff.txt
+
+          # Truncate if too large (keep first 500 lines)
+          if [ $(wc -l < pr_diff.txt) -gt 500 ]; then
+            head -500 pr_diff.txt > pr_diff_truncated.txt
+            echo "" >> pr_diff_truncated.txt
+            echo "... (diff truncated, $(wc -l < pr_diff.txt) total lines)" >> pr_diff_truncated.txt
+            mv pr_diff_truncated.txt pr_diff.txt
+          fi
+
+          # Get PR details as JSON
+          gh pr view ${{ github.event.pull_request.number }} --json title,body > pr_details.json
+
+      - name: Create review prompt
+        run: |
+          PR_TITLE=$(jq -r '.title' pr_details.json)
+          PR_BODY=$(jq -r '.body // "No description provided"' pr_details.json)
+
+          cat > review_prompt.txt << 'PROMPT_END'
+          You are reviewing a pull request for the NES Outage Status Checker project.
+          This is a web app for monitoring Nashville Electric Service power outages.
+          Tech stack: Vanilla HTML/CSS/JS, Leaflet.js for maps.
+
+          Please provide a code review with:
+          1. A brief summary of the changes
+          2. Any potential issues, bugs, or security concerns
+          3. Suggestions for improvement (if any)
+          4. A clear recommendation: APPROVE, REQUEST_CHANGES, or COMMENT
+
+          Format your response as a GitHub PR review comment (markdown).
+          Keep the review concise but thorough. Be constructive and helpful.
+          PROMPT_END
+
+          echo "" >> review_prompt.txt
+          echo "PR Title: $PR_TITLE" >> review_prompt.txt
+          echo "" >> review_prompt.txt
+          echo "PR Description:" >> review_prompt.txt
+          echo "$PR_BODY" >> review_prompt.txt
+          echo "" >> review_prompt.txt
+          echo "Here is the diff:" >> review_prompt.txt
+          echo '```diff' >> review_prompt.txt
+          cat pr_diff.txt >> review_prompt.txt
+          echo '```' >> review_prompt.txt
+
+      - name: Run Claude Code Review
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          cat review_prompt.txt | claude --print --model sonnet > review_output.txt
+
+      - name: Post review comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "## 🤖 Claude Code Review"
+            echo ""
+            cat review_output.txt
+            echo ""
+            echo "---"
+            echo "*This review was generated automatically by [Claude Code](https://claude.ai/claude-code)*"
+          } > comment_body.txt
+
+          gh pr comment ${{ github.event.pull_request.number }} --body-file comment_body.txt
