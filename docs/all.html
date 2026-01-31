@@ -2670,7 +2670,7 @@
 
             const labels = chartData.map(d => {
                 const date = new Date(d.timestamp);
-                return date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+                return date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago' });
             });
 
             // Get data based on selected metric (use ?? 0 for legacy data missing new fields)
