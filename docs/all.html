@@ -1536,7 +1536,6 @@
 
     <script>
         const API_URL = 'https://utilisocial.io/datacapable/v2/p/NES/map/events';
-        // Chart data: loaded from DigitalOcean Spaces (nes); updated every 10 min by collector
         const CHART_DATA_URL = 'https://nes.nyc3.digitaloceanspaces.com/chart-data.json';
         const SETTINGS_KEY = 'nes-outage-all-settings';
         let refreshTimer = null;
@@ -2563,7 +2562,7 @@
             }
         }
 
-        // Get chart data: from CHART_DATA_URL (Spaces) if set, else localStorage
+        // Get chart data: from CHART_DATA_URL if set, else localStorage
         async function getChartData() {
             if (CHART_DATA_URL) {
                 try {

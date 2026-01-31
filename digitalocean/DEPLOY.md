@@ -19,7 +19,7 @@ scp digitalocean/chart_collector.py digitalocean/requirements.txt digitalocean/r
 
 ## 3. On the server: credentials and deps
 
-`run.sh` reads credentials from the same directory (**/opt/nes-chart/**): access key from `SPACES_KEY.txt`, secret from `SPACES_SECRET.txt` (first line of each). It writes to Space **nes** in **nyc3**, so `chart-data.json` is written there.
+`run.sh` reads credentials from the same directory (**/opt/nes-chart/**): access key from `SPACES_KEY.txt`, secret from `SPACES_SECRET.txt` (first line of each). It writes to Space **nes** in **nyc3**, so `chart-data.json` is at https://nes.nyc3.digitaloceanspaces.com/chart-data.json.
 
 Then create a venv and install deps (server uses externally-managed Python):
 
@@ -58,8 +58,8 @@ The script writes to Space **nes** (**nyc3**). The JSON is public at:
 
 **`https://nes.nyc3.digitaloceanspaces.com/chart-data.json`**
 
-This URL is set in **docs/all.html** as `CHART_DATA_URL`. To use a different Space, override `SPACES_BUCKET` / `SPACES_REGION` in `run.sh` and update `CHART_DATA_URL` in the frontend.
+This URL is set in **docs/all.html** as `CHART_DATA_URL`. Cron runs every 10 minutes (`*/10 * * * *`), so the file is updated every 10 minutes. To use a different Space, override `SPACES_BUCKET` / `SPACES_REGION` in `run.sh` and update `CHART_DATA_URL` in the frontend.
 
 ## CORS
 
-Ensure the Space has CORS allowed for your app’s origin (e.g. `https://nes-outage-checker.com`, GitHub Pages origin). In DigitalOcean: Space → Settings → CORS, or use the API/CLI to set a rule that allows `GET` from your origins.
+Ensure the Space has CORS allowed for your app’s origin (e.g. `https://nes-outage-checker.com`, GitHub Pages origin). In DigitalOcean: **Spaces → nes → Settings → CORS**. Add a rule that allows GET/HEAD from your app origins (e.g. `https://nes-outage-checker.com`, `http://localhost:8000`).

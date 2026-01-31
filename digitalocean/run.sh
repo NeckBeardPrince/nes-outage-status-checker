@@ -3,7 +3,7 @@
 # Cron: */10 * * * * /opt/nes-chart/run.sh >> /var/log/nes-chart.log 2>&1
 set -e
 cd "$(dirname "$0")"
-# Space for chart data: nes, nyc3
+# Space for chart data: nes, nyc3 → https://nes.nyc3.digitaloceanspaces.com/chart-data.json
 export SPACES_BUCKET="${SPACES_BUCKET:-nes}"
 export SPACES_REGION="${SPACES_REGION:-nyc3}"
 if [ -f SPACES_KEY.txt ]; then

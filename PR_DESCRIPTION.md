@@ -1,4 +1,4 @@
-# Add line chart view (fetches data from DigitalOcean Spaces)
+# Add line chart view
 
 ## Summary
 
@@ -6,7 +6,7 @@ Adds a **Chart** view alongside Grid and Map so users can see trends over time. 
 
 ### Chart data source
 
-The frontend **fetches chart history from DigitalOcean Spaces**: `https://nes.nyc3.digitaloceanspaces.com/chart-data.json`. A collector (cron on a server) updates that JSON every 10 minutes. The app loads it on page load and uses it for the line chart. localStorage is used only as a fallback when the fetch fails (e.g. CORS when viewing locally).
+The frontend fetches chart history from a JSON URL: `https://nes.nyc3.digitaloceanspaces.com/chart-data.json`. The app loads it on page load and uses it for the line chart. localStorage is used as a fallback when the fetch fails.
 
 ### Chart features
 
