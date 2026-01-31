@@ -2530,9 +2530,9 @@
             // Sort by timestamp
             chartData.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
-            // Keep only last 10 days (1440 data points max)
+            // Keep only last 2 months to avoid large data file
             const cutoff = new Date();
-            cutoff.setDate(cutoff.getDate() - 10);
+            cutoff.setMonth(cutoff.getMonth() - 2);
             chartData = chartData.filter(d => new Date(d.timestamp) >= cutoff);
 
             // Store back
@@ -2600,22 +2600,16 @@
 
             const labels = chartData.map(d => {
                 const date = new Date(d.timestamp);
-                const now = new Date();
-                // Show date if not today
-                if (date.toDateString() === now.toDateString()) {
-                    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-                } else {
-                    return date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-                }
+                return date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
             });
 
             // Get data based on selected metric (use ?? 0 for legacy data missing new fields)
             const metricConfig = {
-                customers: { key: 'numPeople', label: 'Affected Customers', title: 'Total Affected Customers Over Time' },
-                outages: { key: 'eventCount', label: 'Number of Outages', title: 'Total Number of Outages Over Time' },
-                activeCrews: { key: 'activeCrews', label: 'Active Crews', title: 'Active Crews Over Time' },
-                customersBeingRestored: { key: 'customersBeingRestored', label: 'Customers Being Restored', title: 'Customers Being Restored Over Time' },
-                waitingForCrew: { key: 'waitingForCrew', label: 'Waiting for Crew', title: 'Waiting for Crew Over Time' }
+                customers: { key: 'numPeople', label: 'Affected Customers', title: 'Total Affected Customers Over Time', tooltipFormat: (v) => `${v.toLocaleString()} customers` },
+                outages: { key: 'eventCount', label: 'Number of Outages', title: 'Total Number of Outages Over Time', tooltipFormat: (v) => `${v.toLocaleString()} outage${v === 1 ? '' : 's'}` },
+                activeCrews: { key: 'activeCrews', label: 'Active Crews', title: 'Active Crews Over Time', tooltipFormat: (v) => `${v.toLocaleString()} crew${v === 1 ? '' : 's'}` },
+                customersBeingRestored: { key: 'customersBeingRestored', label: 'Customers Being Restored', title: 'Customers Being Restored Over Time', tooltipFormat: (v) => `${v.toLocaleString()} customers` },
+                waitingForCrew: { key: 'waitingForCrew', label: 'Waiting for Crew', title: 'Waiting for Crew Over Time', tooltipFormat: (v) => `${v.toLocaleString()} waiting` }
             };
             const config = metricConfig[chartMetric] || metricConfig.customers;
             const data = chartData.map(d => d[config.key] ?? 0);
@@ -2662,10 +2656,7 @@
                             padding: 12,
                             callbacks: {
                                 label: function(context) {
-                                    const value = context.parsed.y.toLocaleString();
-                                    return chartMetric === 'customers' 
-                                        ? `${value} customers` 
-                                        : `${value} outage${value === '1' ? '' : 's'}`;
+                                    return config.tooltipFormat(context.parsed.y);
                                 }
                             }
                         }
