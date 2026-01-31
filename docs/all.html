@@ -1536,8 +1536,8 @@
 
     <script>
         const API_URL = 'https://utilisocial.io/datacapable/v2/p/NES/map/events';
-        // Chart data: loaded from DigitalOcean Spaces (same Space as bibcast: mlcb; updated every 10 min by /opt/nes-chart)
-        const CHART_DATA_URL = 'https://mlcb.nyc3.digitaloceanspaces.com/chart-data.json';
+        // Chart data: loaded from DigitalOcean Spaces (nes); updated every 10 min by collector
+        const CHART_DATA_URL = 'https://nes.nyc3.digitaloceanspaces.com/chart-data.json';
         const SETTINGS_KEY = 'nes-outage-all-settings';
         let refreshTimer = null;
         let countdownTimer = null;
