@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"strconv"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -14,7 +14,12 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-const apiURL = "https://utilisocial.io/datacapable/v2/p/NES/map/events"
+const (
+	apiURL            = "https://utilisocial.io/datacapable/v2/p/NES/map/events"
+	dataFileName      = ".nes-outage-history.json"
+	retentionDays     = 10
+	collectionInterval = 10 * time.Minute // Store data every 10 minutes
+)
 
 type OutageEvent struct {
 	ID              int     `json:"id"`
@@ -30,28 +35,35 @@ type OutageEvent struct {
 }
 
 type dataPoint struct {
-	Timestamp time.Time
-	NumPeople int
+	Timestamp time.Time `json:"timestamp"`
+	NumPeople int       `json:"numPeople"`
+}
+
+type storedData struct {
+	DataPoints []dataPoint `json:"dataPoints"`
 }
 
 type model struct {
-	eventID      int
-	event        *OutageEvent
-	spinner      spinner.Model
-	loading      bool
-	err          error
-	lastChecked  time.Time
-	blinkOn      bool
-	statusBlink  bool
-	showChart    bool
-	history      []dataPoint
+	spinner       spinner.Model
+	loading       bool
+	err           error
+	lastChecked   time.Time
+	blinkOn       bool
+	statusBlink   bool
+	showChart     bool
+	history       []dataPoint
+	totalAffected int
+	eventCount    int
+	lastSavedTime time.Time
+	dataFilePath  string
 }
 
 type tickMsg time.Time
 type blinkMsg time.Time
 type fetchResultMsg struct {
-	event *OutageEvent
-	err   error
+	totalAffected int
+	eventCount    int
+	err           error
 }
 
 var (
@@ -94,32 +106,170 @@ var (
 	timeStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("245")).
 			Italic(true)
-
-	chartStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("46"))
 )
 
-func initialModel(eventID int) model {
+func getDataFilePath() string {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		// Fallback to current directory
+		return dataFileName
+	}
+	return filepath.Join(homeDir, dataFileName)
+}
+
+// roundTo10Minutes rounds a time to the nearest 10-minute interval
+func roundTo10Minutes(t time.Time) time.Time {
+	minutes := t.Minute()
+	roundedMinutes := (minutes / 10) * 10
+	return time.Date(
+		t.Year(),
+		t.Month(),
+		t.Day(),
+		t.Hour(),
+		roundedMinutes,
+		0,
+		0,
+		t.Location(),
+	)
+}
+
+func loadHistoricalData(filePath string) ([]dataPoint, time.Time) {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		// File doesn't exist yet, return empty
+		return []dataPoint{}, time.Time{}
+	}
+
+	var stored storedData
+	if err := json.Unmarshal(data, &stored); err != nil {
+		// Invalid data, return empty
+		return []dataPoint{}, time.Time{}
+	}
+
+	// Filter to last 10 days
+	cutoff := time.Now().AddDate(0, 0, -retentionDays)
+	filtered := []dataPoint{}
+	
+	for _, point := range stored.DataPoints {
+		// Round timestamp to 10-minute interval
+		rounded := roundTo10Minutes(point.Timestamp)
+		
+		if rounded.After(cutoff) || rounded.Equal(cutoff) {
+			// Check if we already have this 10-minute interval (deduplicate)
+			exists := false
+			for _, existing := range filtered {
+				if existing.Timestamp.Equal(rounded) {
+					exists = true
+					break
+				}
+			}
+			if !exists {
+				filtered = append(filtered, dataPoint{
+					Timestamp: rounded,
+					NumPeople: point.NumPeople,
+				})
+			}
+		}
+	}
+
+	// Sort by timestamp
+	for i := 0; i < len(filtered)-1; i++ {
+		for j := i + 1; j < len(filtered); j++ {
+			if filtered[i].Timestamp.After(filtered[j].Timestamp) {
+				filtered[i], filtered[j] = filtered[j], filtered[i]
+			}
+		}
+	}
+
+	// Get last saved time from the last data point if available
+	var lastSaved time.Time
+	if len(filtered) > 0 {
+		lastSaved = filtered[len(filtered)-1].Timestamp
+	}
+	return filtered, lastSaved
+}
+
+func saveHistoricalData(filePath string, history []dataPoint) error {
+	// Filter to last 10 days
+	cutoff := time.Now().AddDate(0, 0, -retentionDays)
+	filtered := []dataPoint{}
+	
+	for _, point := range history {
+		// Round to 10-minute interval
+		rounded := roundTo10Minutes(point.Timestamp)
+		
+		if rounded.After(cutoff) || rounded.Equal(cutoff) {
+			filtered = append(filtered, dataPoint{
+				Timestamp: rounded,
+				NumPeople: point.NumPeople,
+			})
+		}
+	}
+
+	// Deduplicate by 10-minute interval (keep latest value for each interval)
+	intervalMap := make(map[string]dataPoint)
+	for _, point := range filtered {
+		key := point.Timestamp.Format("2006-01-02T15:04")
+		if existing, ok := intervalMap[key]; !ok || point.Timestamp.After(existing.Timestamp) {
+			intervalMap[key] = point
+		}
+	}
+
+	// Convert back to slice
+	deduplicated := make([]dataPoint, 0, len(intervalMap))
+	for _, point := range intervalMap {
+		deduplicated = append(deduplicated, point)
+	}
+
+	// Sort by timestamp
+	for i := 0; i < len(deduplicated)-1; i++ {
+		for j := i + 1; j < len(deduplicated); j++ {
+			if deduplicated[i].Timestamp.After(deduplicated[j].Timestamp) {
+				deduplicated[i], deduplicated[j] = deduplicated[j], deduplicated[i]
+			}
+		}
+	}
+
+	stored := storedData{
+		DataPoints: deduplicated,
+	}
+
+	data, err := json.MarshalIndent(stored, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(filePath, data, 0644)
+}
+
+func initialModel() model {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+	
+	dataFilePath := getDataFilePath()
+	history, lastSaved := loadHistoricalData(dataFilePath)
+	
 	return model{
-		eventID:     eventID,
-		spinner:     s,
-		loading:     true,
-		blinkOn:     true,
-		statusBlink: false,
-		showChart:   false,
-		history:     make([]dataPoint, 0),
+		spinner:       s,
+		loading:       true,
+		blinkOn:       true,
+		statusBlink:   false,
+		showChart:     false,
+		history:       history,
+		totalAffected: 0,
+		eventCount:    0,
+		lastSavedTime: lastSaved,
+		dataFilePath:  dataFilePath,
 	}
 }
 
 func (m model) Init() tea.Cmd {
 	return tea.Batch(
 		m.spinner.Tick,
-		fetchEvent(m.eventID),
-		tickCmd(),
 		blinkCmd(),
+		fetchAllEvents(), // Fetch current data immediately
+		tickCmd(),
 	)
 }
 
@@ -135,27 +285,27 @@ func blinkCmd() tea.Cmd {
 	})
 }
 
-func fetchEvent(eventID int) tea.Cmd {
+func fetchAllEvents() tea.Cmd {
 	return func() tea.Msg {
 		client := &http.Client{Timeout: 10 * time.Second}
 		resp, err := client.Get(apiURL)
 		if err != nil {
-			return fetchResultMsg{nil, fmt.Errorf("failed to fetch: %w", err)}
+			return fetchResultMsg{0, 0, fmt.Errorf("failed to fetch: %w", err)}
 		}
 		defer resp.Body.Close()
 
 		var events []OutageEvent
 		if err := json.NewDecoder(resp.Body).Decode(&events); err != nil {
-			return fetchResultMsg{nil, fmt.Errorf("failed to parse JSON: %w", err)}
+			return fetchResultMsg{0, 0, fmt.Errorf("failed to parse JSON: %w", err)}
 		}
 
+		// Calculate total affected customers across all outages
+		totalAffected := 0
 		for _, e := range events {
-			if e.ID == eventID {
-				return fetchResultMsg{&e, nil}
-			}
+			totalAffected += e.NumPeople
 		}
 
-		return fetchResultMsg{nil, fmt.Errorf("event ID %d not found", eventID)}
+		return fetchResultMsg{totalAffected, len(events), nil}
 	}
 }
 
@@ -165,9 +315,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "q", "ctrl+c", "esc":
 			return m, tea.Quit
-		case "r":
-			m.loading = true
-			return m, fetchEvent(m.eventID)
+	case "r":
+		m.loading = true
+		return m, fetchAllEvents()
 		case "c":
 			m.showChart = !m.showChart
 			return m, nil
@@ -175,7 +325,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tickMsg:
 		m.loading = true
-		return m, tea.Batch(fetchEvent(m.eventID), tickCmd())
+		return m, tea.Batch(fetchAllEvents(), tickCmd())
 
 	case blinkMsg:
 		m.blinkOn = !m.blinkOn
@@ -186,20 +336,62 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.lastChecked = time.Now()
 		if msg.err != nil {
 			m.err = msg.err
-			m.event = nil
+			m.totalAffected = 0
+			m.eventCount = 0
 		} else {
 			m.err = nil
-			m.event = msg.event
-			m.statusBlink = (m.event.Status != "Unassigned")
-			// Add data point to history
-			if m.event != nil {
-				m.history = append(m.history, dataPoint{
-					Timestamp: time.Now(),
-					NumPeople: m.event.NumPeople,
-				})
-				// Keep only last 50 data points
-				if len(m.history) > 50 {
-					m.history = m.history[len(m.history)-50:]
+			m.totalAffected = msg.totalAffected
+			m.eventCount = msg.eventCount
+			
+			// Round current time to 10-minute interval
+			now := time.Now()
+			currentInterval := roundTo10Minutes(now)
+			
+			// Only save if it's a new 10-minute interval
+			shouldSave := currentInterval.After(m.lastSavedTime)
+			
+			if shouldSave {
+				// Add 10-minute interval data point
+				newPoint := dataPoint{
+					Timestamp: currentInterval,
+					NumPeople: msg.totalAffected,
+				}
+				
+				// Check if we already have this interval (replace if exists)
+				found := false
+				for i, point := range m.history {
+					if point.Timestamp.Equal(currentInterval) {
+						m.history[i] = newPoint
+						found = true
+						break
+					}
+				}
+				if !found {
+					m.history = append(m.history, newPoint)
+				}
+				
+				// Sort by timestamp
+				for i := 0; i < len(m.history)-1; i++ {
+					for j := i + 1; j < len(m.history); j++ {
+						if m.history[i].Timestamp.After(m.history[j].Timestamp) {
+							m.history[i], m.history[j] = m.history[j], m.history[i]
+						}
+					}
+				}
+				
+				// Remove data older than 10 days
+				cutoff := time.Now().AddDate(0, 0, -retentionDays)
+				filtered := []dataPoint{}
+				for _, point := range m.history {
+					if point.Timestamp.After(cutoff) || point.Timestamp.Equal(cutoff) {
+						filtered = append(filtered, point)
+					}
+				}
+				m.history = filtered
+				
+				// Save to file
+				if err := saveHistoricalData(m.dataFilePath, m.history); err == nil {
+					m.lastSavedTime = currentInterval
 				}
 			}
 		}
@@ -363,7 +555,15 @@ func renderChart(history []dataPoint, width, height int) string {
 			if idx >= len(displayHistory) {
 				idx = len(displayHistory) - 1
 			}
-			timeStr := displayHistory[idx].Timestamp.Format("3:04 PM")
+			// Format timestamp - show date if it's not today
+			t := displayHistory[idx].Timestamp
+			now := time.Now()
+			var timeStr string
+			if t.Year() == now.Year() && t.Month() == now.Month() && t.Day() == now.Day() {
+				timeStr = t.Format("3 PM")
+			} else {
+				timeStr = t.Format("1/2 3 PM")
+			}
 			result.WriteString(fmt.Sprintf("%-12s", timeStr))
 		}
 	} else if points == 1 {
@@ -383,8 +583,8 @@ func (m model) View() string {
 
 	if m.showChart && len(m.history) > 0 {
 		// Chart view
-		chartContent := labelStyle.Render("Affected Customers Over Time") + "\n"
-		chartContent += valueStyle.Render(fmt.Sprintf("Event ID: %d", m.eventID)) + "\n\n"
+		chartContent := labelStyle.Render("Total Affected Customers Over Time") + "\n"
+		chartContent += valueStyle.Render("All NES Outages") + "\n\n"
 		
 		// Get terminal size for chart dimensions
 		chartContent += renderChart(m.history, 60, 15)
@@ -394,44 +594,15 @@ func (m model) View() string {
 		if m.loading {
 			s += "\n" + m.spinner.View() + " Refreshing..."
 		}
-	} else if m.loading && m.event == nil {
+	} else if m.loading && m.totalAffected == 0 && m.eventCount == 0 {
 		s += m.spinner.View() + " Fetching outage data...\n"
 	} else if m.err != nil {
 		s += errorStyle.Render("Error: "+m.err.Error()) + "\n"
-	} else if m.event != nil {
+	} else {
+		// Summary view
 		content := ""
-
-		content += labelStyle.Render("Event ID: ") + valueStyle.Render(fmt.Sprintf("%d", m.event.ID)) + "\n"
-		content += labelStyle.Render("Identifier: ") + valueStyle.Render(m.event.Identifier) + "\n"
-		content += labelStyle.Render("Title: ") + valueStyle.Render(m.event.Title) + "\n"
-		content += labelStyle.Render("Affected: ") + valueStyle.Render(fmt.Sprintf("%d people", m.event.NumPeople)) + "\n"
-
-		if m.event.Cause != "" {
-			content += labelStyle.Render("Cause: ") + valueStyle.Render(m.event.Cause) + "\n"
-		}
-
-		startTime := time.UnixMilli(m.event.StartTime)
-		content += labelStyle.Render("Started: ") + valueStyle.Render(startTime.Format("Mon Jan 2, 3:04 PM")) + "\n"
-
-		lastUpdated := time.UnixMilli(m.event.LastUpdatedTime)
-		content += labelStyle.Render("Last Updated: ") + valueStyle.Render(lastUpdated.Format("Mon Jan 2, 3:04 PM")) + "\n"
-
-		content += "\n"
-
-		var statusDisplay string
-		if m.event.Status == "Unassigned" {
-			statusDisplay = statusUnassigned.Render("STATUS: UNASSIGNED")
-			content += statusDisplay + "\n"
-			content += valueStyle.Render("No technician assigned yet") + "\n"
-		} else {
-			if m.blinkOn {
-				statusDisplay = statusAssigned.Render("STATUS: " + m.event.Status)
-			} else {
-				statusDisplay = statusAssignedDim.Render("STATUS: " + m.event.Status)
-			}
-			content += statusDisplay + "\n"
-			content += valueStyle.Render("A technician has been assigned!") + "\n"
-		}
+		content += labelStyle.Render("Total Outages: ") + valueStyle.Render(fmt.Sprintf("%d", m.eventCount)) + "\n"
+		content += labelStyle.Render("Total Affected: ") + valueStyle.Render(fmt.Sprintf("%d customers", m.totalAffected)) + "\n"
 
 		s += boxStyle.Render(content) + "\n"
 
@@ -458,19 +629,7 @@ func (m model) View() string {
 }
 
 func main() {
-	if len(os.Args) < 2 {
-		fmt.Println("Usage: nes-outage-status-checker <event-id>")
-		fmt.Println("Example: nes-outage-status-checker 1971637")
-		os.Exit(1)
-	}
-
-	eventID, err := strconv.Atoi(os.Args[1])
-	if err != nil {
-		fmt.Printf("Invalid event ID: %s\n", os.Args[1])
-		os.Exit(1)
-	}
-
-	p := tea.NewProgram(initialModel(eventID))
+	p := tea.NewProgram(initialModel())
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)

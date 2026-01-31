@@ -10,6 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         :root {
             /* Typography */
@@ -947,8 +948,104 @@
             box-shadow: var(--shadow-md);
         }
 
+        .map-chart-wrapper {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .map-chart-wrapper.chart-hidden {
+            grid-template-columns: 1fr;
+        }
+
+        .map-chart-wrapper.chart-only {
+            grid-template-columns: 1fr;
+        }
+
+        .map-chart-wrapper.chart-only .map-container {
+            display: none;
+        }
+
         .map-container {
             position: relative;
+        }
+
+        .chart-container {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: var(--shadow-md);
+            position: relative;
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            gap: 15px;
+        }
+
+        .chart-header h3 {
+            margin: 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            flex: 1;
+        }
+
+        .chart-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #chartMetricSelect {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 6px 12px;
+            color: var(--text-primary);
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        #chartMetricSelect:hover {
+            background: var(--bg-hover);
+            border-color: var(--accent);
+        }
+
+        #chartMetricSelect:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .chart-close {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .chart-close:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        #affectedCustomersChart {
+            max-height: 400px;
         }
 
         .map-legend {
@@ -1246,6 +1343,7 @@
                 <div class="view-toggle">
                     <button id="gridViewBtn" class="active" onclick="setView('grid')">Grid</button>
                     <button id="mapViewBtn" onclick="setView('map')">Map</button>
+                    <button id="chartBtn" onclick="setView('chart')" title="Chart view">Chart</button>
                 </div>
                 <select id="filterStatus" onchange="sortAndFilter()" title="Filter by status">
                     <option value="all" selected>All Status</option>
@@ -1295,33 +1393,51 @@
 
         <div class="events" id="events"></div>
 
-        <div class="map-container hidden" id="mapContainer">
-            <div class="map-header">
-                <div class="map-header-title">
-                    <span class="map-header-pulse"></span>
-                    Where Crews Are Working
+        <div class="map-chart-wrapper hidden chart-hidden" id="mapChartWrapper">
+            <div class="map-container" id="mapContainer">
+                <div class="map-header">
+                    <div class="map-header-title">
+                        <span class="map-header-pulse"></span>
+                        Where Crews Are Working
+                    </div>
+                    <div class="map-header-controls">
+                        <button class="map-ctrl-btn" id="mapStyleBtn" onclick="cycleMapStyle()" title="Cycle map style (S)"><span class="btn-icon">&#x25D0;</span><span class="btn-text">Aerial</span></button>
+                        <button class="map-ctrl-btn" id="fullscreenBtn" onclick="toggleMapFullscreen()" title="Toggle fullscreen (F)"><span class="btn-icon">&#x2922;</span><span class="btn-text">Fullscreen</span></button>
+                        <span id="crewsCount">0 crews</span>
+                    </div>
                 </div>
-                <div class="map-header-controls">
-                    <button class="map-ctrl-btn" id="mapStyleBtn" onclick="cycleMapStyle()" title="Cycle map style (S)"><span class="btn-icon">&#x25D0;</span><span class="btn-text">Aerial</span></button>
-                    <button class="map-ctrl-btn" id="fullscreenBtn" onclick="toggleMapFullscreen()" title="Toggle fullscreen (F)"><span class="btn-icon">&#x2922;</span><span class="btn-text">Fullscreen</span></button>
-                    <span id="crewsCount">0 crews</span>
+                <div id="map"></div>
+                <div class="map-legend">
+                    <div class="legend-title">Active Crews</div>
+                    <div class="legend-item">
+                        <span class="legend-dot assigned"></span>
+                        <span>Crew Working</span>
+                    </div>
+                    <div class="legend-item waiting-legend" style="display: none;">
+                        <span class="legend-dot unassigned"></span>
+                        <span>Waiting for Crew</span>
+                    </div>
+                    <label class="map-toggle">
+                        <input type="checkbox" id="showWaitingToggle" onchange="toggleShowWaiting()">
+                        <span class="map-toggle-label">Show Waiting</span>
+                    </label>
                 </div>
             </div>
-            <div id="map"></div>
-            <div class="map-legend">
-                <div class="legend-title">Active Crews</div>
-                <div class="legend-item">
-                    <span class="legend-dot assigned"></span>
-                    <span>Crew Working</span>
+            <div class="chart-container hidden" id="chartContainer">
+                <div class="chart-header">
+                    <h3 id="chartTitle">Total Affected Customers Over Time</h3>
+                    <div class="chart-controls">
+                        <select id="chartMetricSelect" onchange="changeChartMetric()" title="Select metric to display">
+                            <option value="customers">Affected Customers</option>
+                            <option value="outages">Number of Outages</option>
+                            <option value="activeCrews">Active Crews</option>
+                            <option value="customersBeingRestored">Customers Being Restored</option>
+                            <option value="waitingForCrew">Waiting for Crew</option>
+                        </select>
+                        <button class="chart-close" onclick="setView('grid')" title="Close chart">&times;</button>
+                    </div>
                 </div>
-                <div class="legend-item waiting-legend" style="display: none;">
-                    <span class="legend-dot unassigned"></span>
-                    <span>Waiting for Crew</span>
-                </div>
-                <label class="map-toggle">
-                    <input type="checkbox" id="showWaitingToggle" onchange="toggleShowWaiting()">
-                    <span class="map-toggle-label">Show Waiting</span>
-                </label>
+                <canvas id="affectedCustomersChart"></canvas>
             </div>
         </div>
 
@@ -1423,6 +1539,10 @@
         let showWaitingOnMap = false;
         let mapStyle = 'dark';
         let currentTileLayer = null;
+        let chartVisible = false;
+        let affectedCustomersChart = null;
+        let chartMetric = 'customers'; // 'customers' or 'outages'
+        const CHART_DATA_KEY = 'nes-outage-chart-data';
         // Map tile providers: CartoDB for dark/light themes, ESRI for aerial/satellite
         // subdomains 'abcd' enables parallel tile loading from CDN (not used by ESRI)
         const tileLayers = {
@@ -1458,7 +1578,9 @@
                 sortBy,
                 soundEnabled,
                 lightMode,
-                colorblindMode
+                colorblindMode,
+                chartVisible,
+                chartMetric
             }));
             localStorage.setItem('nes-map-style', mapStyle);
         }
@@ -1473,10 +1595,23 @@
                     soundEnabled = settings.soundEnabled || false;
                     lightMode = settings.lightMode || false;
                     colorblindMode = settings.colorblindMode || false;
+                    chartVisible = settings.chartVisible || false;
+                    chartMetric = settings.chartMetric || 'customers';
                 }
                 const savedMapStyle = localStorage.getItem('nes-map-style');
                 if (savedMapStyle && tileLayers[savedMapStyle]) mapStyle = savedMapStyle;
                 updateSettingsUI();
+                
+                // Restore chart metric selector
+                const metricSelect = document.getElementById('chartMetricSelect');
+                if (metricSelect) {
+                    metricSelect.value = chartMetric;
+                }
+                
+                // Restore chart view if it was visible
+                if (chartVisible) {
+                    setTimeout(() => setView('chart'), 100);
+                }
             } catch {}
         }
 
@@ -1487,6 +1622,7 @@
             document.getElementById('themeBtn').textContent = lightMode ? 'Dark' : 'Light';
             document.getElementById('themeBtn').classList.toggle('active', lightMode);
             document.getElementById('colorblindBtn').classList.toggle('active', colorblindMode);
+            document.getElementById('chartBtn').classList.toggle('active', chartVisible);
             document.body.classList.toggle('light-mode', lightMode);
             document.body.classList.toggle('colorblind-mode', colorblindMode);
             const styles = ['dark', 'light', 'aerial'];
@@ -1495,6 +1631,10 @@
             if (mapStyleBtn) {
                 const textEl = mapStyleBtn.querySelector('.btn-text');
                 if (textEl) textEl.textContent = nextStyle.charAt(0).toUpperCase() + nextStyle.slice(1);
+            }
+            // Update chart if visible and theme changed
+            if (chartVisible && affectedCustomersChart) {
+                renderChart();
             }
         }
 
@@ -1869,6 +2009,21 @@
                 // Store all events for map (before any filtering)
                 allEventsForMap = [...events];
                 sortAndFilter();
+                
+                // Calculate totals and crew metrics, store for chart
+                const totalAffected = events.reduce((sum, e) => sum + (e.numPeople || 0), 0);
+                const totalOutages = events.length;
+                const assignedEvents = events.filter(e => e.status !== 'Unassigned');
+                const unassignedEvents = events.filter(e => e.status === 'Unassigned');
+                const activeCrews = assignedEvents.length;
+                const waitingForCrew = unassignedEvents.length;
+                const customersBeingRestored = assignedEvents.reduce((sum, e) => sum + (e.numPeople || 0), 0);
+                storeChartData(totalAffected, totalOutages, activeCrews, customersBeingRestored, waitingForCrew);
+                
+                // Update chart if visible
+                if (chartVisible && affectedCustomersChart) {
+                    renderChart();
+                }
                 
                 loadingEl.classList.add('hidden');
                 document.getElementById('lastChecked').textContent = new Date().toLocaleTimeString();
@@ -2287,24 +2442,260 @@
 
         function setView(view) {
             currentView = view;
+            chartVisible = (view === 'chart');
 
             document.getElementById('gridViewBtn').classList.toggle('active', view === 'grid');
             document.getElementById('mapViewBtn').classList.toggle('active', view === 'map');
+            document.getElementById('chartBtn').classList.toggle('active', view === 'chart');
 
-            document.getElementById('events').classList.toggle('hidden', view === 'map');
-            document.getElementById('mapContainer').classList.toggle('hidden', view === 'grid');
+            document.getElementById('events').classList.toggle('hidden', view !== 'grid');
+            document.getElementById('mapChartWrapper').classList.toggle('hidden', view === 'grid');
 
             // Compact button only works in grid view
-            document.getElementById('compactBtn').classList.toggle('hidden', view === 'map');
+            document.getElementById('compactBtn').classList.toggle('hidden', view !== 'grid');
+
+            const mapChartWrapper = document.getElementById('mapChartWrapper');
+            const mapContainer = document.getElementById('mapContainer');
+            const chartContainer = document.getElementById('chartContainer');
 
             if (view === 'map') {
+                mapChartWrapper.classList.remove('chart-only');
+                mapChartWrapper.classList.add('chart-hidden');
+                mapContainer.classList.remove('hidden');
+                chartContainer.classList.add('hidden');
                 initMap();
-                // Need to invalidate size after showing
                 setTimeout(() => {
-                    map.invalidateSize();
-                    updateMapMarkers();
+                    if (map) {
+                        map.invalidateSize();
+                        updateMapMarkers();
+                    }
                 }, 100);
+            } else if (view === 'chart') {
+                mapChartWrapper.classList.add('chart-only');
+                mapChartWrapper.classList.remove('chart-hidden');
+                mapContainer.classList.add('hidden');
+                chartContainer.classList.remove('hidden');
+                setTimeout(() => renderChart(), 100);
             }
+
+            saveSettings();
+        }
+
+        // Round time to 10-minute interval
+        function roundTo10Minutes(date) {
+            const minutes = date.getMinutes();
+            const roundedMinutes = Math.floor(minutes / 10) * 10;
+            const rounded = new Date(date);
+            rounded.setMinutes(roundedMinutes, 0, 0);
+            return rounded;
+        }
+
+        // Store chart data point
+        function storeChartData(totalAffected, totalOutages, activeCrews, customersBeingRestored, waitingForCrew) {
+            const now = new Date();
+            const interval = roundTo10Minutes(now);
+            
+            // Get existing data
+            let chartData = [];
+            try {
+                const stored = localStorage.getItem(CHART_DATA_KEY);
+                if (stored) {
+                    chartData = JSON.parse(stored);
+                }
+            } catch (e) {
+                console.error('Error loading chart data:', e);
+            }
+
+            // Check if we already have data for this interval
+            const existingIndex = chartData.findIndex(d => {
+                const dTime = new Date(d.timestamp);
+                return dTime.getTime() === interval.getTime();
+            });
+
+            const dataPoint = {
+                timestamp: interval.toISOString(),
+                numPeople: totalAffected,
+                eventCount: totalOutages,
+                activeCrews: activeCrews,
+                customersBeingRestored: customersBeingRestored,
+                waitingForCrew: waitingForCrew
+            };
+
+            if (existingIndex >= 0) {
+                chartData[existingIndex] = dataPoint;
+            } else {
+                chartData.push(dataPoint);
+            }
+
+            // Sort by timestamp
+            chartData.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+            // Keep only last 10 days (1440 data points max)
+            const cutoff = new Date();
+            cutoff.setDate(cutoff.getDate() - 10);
+            chartData = chartData.filter(d => new Date(d.timestamp) >= cutoff);
+
+            // Store back
+            try {
+                localStorage.setItem(CHART_DATA_KEY, JSON.stringify(chartData));
+            } catch (e) {
+                console.error('Error storing chart data:', e);
+            }
+        }
+
+        // Get chart data
+        function getChartData() {
+            try {
+                const stored = localStorage.getItem(CHART_DATA_KEY);
+                if (stored) {
+                    return JSON.parse(stored);
+                }
+            } catch (e) {
+                console.error('Error loading chart data:', e);
+            }
+            return [];
+        }
+
+        function changeChartMetric() {
+            const select = document.getElementById('chartMetricSelect');
+            chartMetric = select.value;
+            saveSettings();
+            renderChart();
+        }
+
+        // Render the chart
+        function renderChart() {
+            const chartContainer = document.getElementById('chartContainer');
+            const canvas = document.getElementById('affectedCustomersChart');
+            if (!canvas || !chartContainer) return;
+
+            const chartData = getChartData();
+            
+            // Destroy existing chart if it exists
+            if (affectedCustomersChart) {
+                affectedCustomersChart.destroy();
+                affectedCustomersChart = null;
+            }
+            
+            if (chartData.length < 2) {
+                // Show message but keep canvas structure
+                const existingMsg = chartContainer.querySelector('.chart-empty-msg');
+                if (!existingMsg) {
+                    const msg = document.createElement('p');
+                    msg.className = 'chart-empty-msg';
+                    msg.style.cssText = 'text-align: center; color: var(--text-secondary); padding: 40px; margin: 0;';
+                    msg.textContent = 'Not enough data yet. Data is collected every 10 minutes.';
+                    canvas.style.display = 'none';
+                    chartContainer.appendChild(msg);
+                }
+                return;
+            }
+
+            // Remove empty message if it exists
+            const emptyMsg = chartContainer.querySelector('.chart-empty-msg');
+            if (emptyMsg) {
+                emptyMsg.remove();
+            }
+            canvas.style.display = 'block';
+
+            const labels = chartData.map(d => {
+                const date = new Date(d.timestamp);
+                const now = new Date();
+                // Show date if not today
+                if (date.toDateString() === now.toDateString()) {
+                    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+                } else {
+                    return date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+                }
+            });
+
+            // Get data based on selected metric (use ?? 0 for legacy data missing new fields)
+            const metricConfig = {
+                customers: { key: 'numPeople', label: 'Affected Customers', title: 'Total Affected Customers Over Time' },
+                outages: { key: 'eventCount', label: 'Number of Outages', title: 'Total Number of Outages Over Time' },
+                activeCrews: { key: 'activeCrews', label: 'Active Crews', title: 'Active Crews Over Time' },
+                customersBeingRestored: { key: 'customersBeingRestored', label: 'Customers Being Restored', title: 'Customers Being Restored Over Time' },
+                waitingForCrew: { key: 'waitingForCrew', label: 'Waiting for Crew', title: 'Waiting for Crew Over Time' }
+            };
+            const config = metricConfig[chartMetric] || metricConfig.customers;
+            const data = chartData.map(d => d[config.key] ?? 0);
+            const label = config.label;
+            const title = config.title;
+
+            // Update chart title
+            document.getElementById('chartTitle').textContent = title;
+
+            const isLight = lightMode;
+            const textColor = isLight ? '#1C1917' : '#FAFAF9';
+            const gridColor = isLight ? 'rgba(28, 25, 23, 0.1)' : 'rgba(250, 250, 249, 0.1)';
+            const lineColor = isLight ? '#10B981' : '#10B981';
+
+            affectedCustomersChart = new Chart(canvas, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: label,
+                        data: data,
+                        borderColor: lineColor,
+                        backgroundColor: isLight ? 'rgba(16, 185, 129, 0.1)' : 'rgba(16, 185, 129, 0.2)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 2,
+                        pointHoverRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: isLight ? '#FFFFFF' : '#292524',
+                            titleColor: textColor,
+                            bodyColor: textColor,
+                            borderColor: isLight ? '#E7E5E4' : '#44403C',
+                            borderWidth: 1,
+                            padding: 12,
+                            callbacks: {
+                                label: function(context) {
+                                    const value = context.parsed.y.toLocaleString();
+                                    return chartMetric === 'customers' 
+                                        ? `${value} customers` 
+                                        : `${value} outage${value === '1' ? '' : 's'}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: {
+                                color: textColor,
+                                maxRotation: 45,
+                                minRotation: 45
+                            },
+                            grid: {
+                                color: gridColor
+                            }
+                        },
+                        y: {
+                            ticks: {
+                                color: textColor,
+                                callback: function(value) {
+                                    return value.toLocaleString();
+                                }
+                            },
+                            grid: {
+                                color: gridColor
+                            },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
         }
 
         // Version check
