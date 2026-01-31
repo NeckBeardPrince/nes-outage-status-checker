@@ -1,65 +1,53 @@
 # NES Outage Status Checker
 
-A terminal UI app to track Nashville Electric Service (NES) power outage repair status. Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) and [Lip Gloss](https://github.com/charmbracelet/lipgloss).
+A web app to track Nashville Electric Service (NES) power outage status. Monitor your specific outage, view all active outages across the service area, and see historical trends.
 
-## My award
+**Live Site:** [nes-outage-checker.com](https://nes-outage-checker.com)
+
+## My Award
 
 <img alt="Now I'm autistic?" src="./images/award.png" />
 
 ## Notice
 
-This isn't an officially sanctioned app, and NES or their data provider might revoke or block this access. Though it's just using public data, so I don't see why they would.
+This is an unofficial community project. It uses publicly available NES outage data to provide a more user-friendly monitoring experience.
 
 ## Why?
 
-During outages, the NES outage map shows affected areas but doesn't clearly indicate whether a technician has been assigned to your specific outage. This tool monitors your outage event and alerts you when the status changes from "Unassigned" to "Assigned" (or any other status), so you know help is on the way.
+During outages, the NES outage map shows affected areas but doesn't clearly indicate whether a technician has been assigned to your specific outage. This tool monitors your outage event and alerts you when the status changes, so you know help is on the way.
 
 ## Features
 
-- Real-time status monitoring with auto-refresh every 30 seconds
-- Color-coded status display:
-  - **Red**: Unassigned (no technician dispatched yet)
-  - **Flashing Green**: Assigned (technician en route!)
-- Shows outage details: affected customers, start time, last update, cause (if known)
-- Manual refresh with `r` key
-- Quit with `q` or `Esc`
+### Monitor Page
+- **Track specific outages** by Event ID or address lookup
+- **Browser notifications** when status changes
+- **Sound alerts** for status updates
+- **Multi-monitor support** - track up to 4 outages at once
+- **Shareable URLs** - send your monitor config to others
+- **Status history** - see how your outage status has changed
+- **Crews Near Me map** - view NES crews working near your outages
 
-## Finding Your Event ID
+### All Outages Page
+- **View all active outages** across the NES service area
+- **Filter by status** (Assigned/Unassigned) and affected customers
+- **Sort options** - by status, duration, most affected, or recently updated
+- **Map view** - see outages plotted geographically with color-coded markers
+- **Chart view** - track metrics over time (affected customers, outage count, active crews)
+- **Change history** - log of new outages, resolved outages, and status changes
 
-1. Go to [nespower.com/outages](https://www.nespower.com/outages/)
-2. Open your browsers Dev Tools
-3. Click on your outage marker on the map
-4. Get event id.
-   <img width="3840" height="748" alt="How tf do I get the eventId?" src="./images/eventId.png" />
+### Both Pages
+- **Auto-refresh** at configurable intervals
+- **Light/dark mode** with theme toggle
+- **Colorblind-friendly mode**
+- **Keyboard shortcuts** for quick actions
+- **Map style toggle** - dark, light, or aerial views
+- **Offline detection** - banner when connection is lost
 
-## CLI Installation
+## How It Works
 
-### From source
+All data comes directly from the NES public API. We don't add, modify, or interpret any information - we just fetch it and display it in a more accessible format. See the [How It Works](https://nes-outage-checker.com/how-it-works.html) page for technical details.
 
-Requires Go 1.21+
-
-```bash
-git clone https://github.com/yourusername/nes-outage-status-checker.git
-cd nes-outage-status-checker
-go build -o nes-outage-status-checker
-```
-
-## Usage
-
-1. Find your outage event ID from the [NES Outage Map](https://www.nespower.com/outages/)
-2. Run the checker with your event ID:
-
-```bash
-./nes-outage-status-checker <event-id>
-```
-
-Example:
-
-```bash
-./nes-outage-status-checker 1971637
-```
-
-## API
+## Data Source
 
 This tool uses the public NES outage API:
 
@@ -67,6 +55,10 @@ This tool uses the public NES outage API:
 https://utilisocial.io/datacapable/v2/p/NES/map/events
 ```
 
+## Contributing
+
+Contributions welcome! See the [contributors page](https://github.com/NeckBeardPrince/nes-outage-status-checker/graphs/contributors) for those who have helped improve this project.
+
 ## License
 
-The Unlicense
+[The Unlicense](LICENSE) - Public Domain

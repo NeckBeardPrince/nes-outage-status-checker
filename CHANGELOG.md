@@ -2,6 +2,24 @@
 
 All notable changes to the NES Outage Status Checker will be documented in this file.
 
+## [1.11.0] - 2026-01-31
+
+*Thank you to [cgoliver](https://github.com/cgoliver) for [PR #9](https://github.com/NeckBeardPrince/nes-outage-status-checker/pull/9)!*
+
+### Added
+
+#### Web App - All Outages Page
+- **Chart view** - New view option alongside Grid and Map to visualize trends over time
+- **Multiple chart metrics** - Select from Affected Customers, Number of Outages, Active Crews, Customers Being Restored, or Waiting for Crew
+- **Historical data collection** - Snapshots stored every 10 minutes with 2-month retention
+- **Interactive tooltips** - Hover to see values with metric-specific formatting
+
+### Removed
+
+- **CLI tool deprecated** - The command-line interface has been removed. The web app at [nes-outage-checker.com](https://nes-outage-checker.com) is now the primary way to use this tool.
+
+---
+
 ## [1.10.0] - 2026-01-30
 
 *Thank you to [nico22nguyen](https://github.com/nico22nguyen) for [PR #8](https://github.com/NeckBeardPrince/nes-outage-status-checker/pull/8)!*
