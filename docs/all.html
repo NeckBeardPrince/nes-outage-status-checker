@@ -1536,6 +1536,8 @@
 
     <script>
         const API_URL = 'https://utilisocial.io/datacapable/v2/p/NES/map/events';
+        // Chart data: loaded from DigitalOcean Spaces (same Space as bibcast: mlcb; updated every 10 min by /opt/nes-chart)
+        const CHART_DATA_URL = 'https://mlcb.nyc3.digitaloceanspaces.com/chart-data.json';
         const SETTINGS_KEY = 'nes-outage-all-settings';
         let refreshTimer = null;
         let countdownTimer = null;
@@ -2036,7 +2038,7 @@
                 const activeCrews = assignedEvents.length;
                 const waitingForCrew = unassignedEvents.length;
                 const customersBeingRestored = assignedEvents.reduce((sum, e) => sum + (e.numPeople || 0), 0);
-                storeChartData(totalAffected, totalOutages, activeCrews, customersBeingRestored, waitingForCrew);
+                if (!CHART_DATA_URL) storeChartData(totalAffected, totalOutages, activeCrews, customersBeingRestored, waitingForCrew);
                 
                 // Update chart if visible
                 if (chartVisible && affectedCustomersChart) {
@@ -2561,13 +2563,22 @@
             }
         }
 
-        // Get chart data
-        function getChartData() {
+        // Get chart data: from CHART_DATA_URL (Spaces) if set, else localStorage
+        async function getChartData() {
+            if (CHART_DATA_URL) {
+                try {
+                    const response = await fetch(CHART_DATA_URL + (CHART_DATA_URL.indexOf('?') >= 0 ? '&' : '?') + '_=' + Date.now());
+                    if (response.ok) {
+                        const data = await response.json();
+                        return Array.isArray(data) ? data : [];
+                    }
+                } catch (e) {
+                    console.warn('Chart data from server failed, using localStorage if any:', e.message);
+                }
+            }
             try {
                 const stored = localStorage.getItem(CHART_DATA_KEY);
-                if (stored) {
-                    return JSON.parse(stored);
-                }
+                if (stored) return JSON.parse(stored);
             } catch (e) {
                 console.error('Error loading chart data:', e);
             }
@@ -2582,12 +2593,12 @@
         }
 
         // Render the chart
-        function renderChart() {
+        async function renderChart() {
             const chartContainer = document.getElementById('chartContainer');
             const canvas = document.getElementById('affectedCustomersChart');
             if (!canvas || !chartContainer) return;
 
-            const chartData = getChartData();
+            const chartData = await getChartData();
             
             // Destroy existing chart if it exists
             if (affectedCustomersChart) {
