@@ -1037,6 +1037,57 @@
             border-color: var(--accent);
         }
 
+        .chart-range-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+
+        .chart-range-row label {
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+        }
+
+        #chartRangeSlider {
+            flex: 1;
+            min-width: 120px;
+            max-width: 200px;
+            height: 6px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: var(--bg-tertiary);
+            border-radius: 3px;
+        }
+
+        #chartRangeSlider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+            border: 2px solid var(--bg-primary);
+            box-shadow: var(--shadow-sm);
+        }
+
+        #chartRangeSlider::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+            border: 2px solid var(--bg-primary);
+        }
+
+        #chartRangeLabel {
+            font-size: 0.8125rem;
+            color: var(--text-primary);
+            min-width: 80px;
+        }
+
         .chart-close {
             background: none;
             border: none;
@@ -1056,6 +1107,53 @@
         .chart-close:hover {
             background: var(--bg-hover);
             color: var(--text-primary);
+        }
+
+        .chart-y-range {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 0;
+            margin-bottom: 4px;
+        }
+
+        .chart-y-range label {
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+
+        #chartYRangeSlider {
+            flex: 1;
+            max-width: 200px;
+            height: 6px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: var(--bg-tertiary);
+            border-radius: 3px;
+            outline: none;
+        }
+
+        #chartYRangeSlider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+            border: 2px solid var(--bg-primary);
+            box-shadow: var(--shadow-sm);
+        }
+
+        #chartYRangeSlider::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+            border: 2px solid var(--bg-primary);
+            box-shadow: var(--shadow-sm);
         }
 
         #affectedCustomersChart {
@@ -1455,6 +1553,10 @@
                         <button class="chart-close" onclick="setView('grid')" title="Close chart">&times;</button>
                     </div>
                 </div>
+                <div class="chart-y-range">
+                    <label for="chartYRangeSlider" id="chartYRangeLabel">Y min: 0</label>
+                    <input type="range" id="chartYRangeSlider" min="0" max="100" value="0" step="1" oninput="changeChartYRange()" title="Set Y axis minimum (0 to max − 10%)">
+                </div>
                 <canvas id="affectedCustomersChart"></canvas>
             </div>
         </div>
@@ -1561,7 +1663,7 @@
         let chartVisible = false;
         let affectedCustomersChart = null;
         let chartMetric = 'customers'; // 'customers' or 'outages'
-        const CHART_DATA_KEY = 'nes-outage-chart-data';
+        let chartYRange = null; // null = y-axis min 0, or number = y-axis minimum value
         // Map tile providers: CartoDB for dark/light themes, ESRI for aerial/satellite
         // subdomains 'abcd' enables parallel tile loading from CDN (not used by ESRI)
         const tileLayers = {
@@ -1599,7 +1701,8 @@
                 lightMode,
                 colorblindMode,
                 chartVisible,
-                chartMetric
+                chartMetric,
+                chartYRange
             }));
             localStorage.setItem('nes-map-style', mapStyle);
         }
@@ -1616,16 +1719,18 @@
                     colorblindMode = settings.colorblindMode || false;
                     chartVisible = settings.chartVisible || false;
                     chartMetric = settings.chartMetric || 'customers';
+                    const v = Number(settings.chartYRange);
+                    chartYRange = (v > 100 || v < 0) ? v : null; // migrate old 0–100 to full range
                 }
                 const savedMapStyle = localStorage.getItem('nes-map-style');
                 if (savedMapStyle && tileLayers[savedMapStyle]) mapStyle = savedMapStyle;
                 updateSettingsUI();
                 
-                // Restore chart metric selector
+                // Restore chart metric and Y range
                 const metricSelect = document.getElementById('chartMetricSelect');
-                if (metricSelect) {
-                    metricSelect.value = chartMetric;
-                }
+                if (metricSelect) metricSelect.value = chartMetric;
+                const yRangeSlider = document.getElementById('chartYRangeSlider');
+                if (yRangeSlider) updateChartYRangeLabel(yRangeSlider.value ? parseInt(yRangeSlider.value, 10) : null);
                 
                 // Restore chart view if it was visible
                 if (chartVisible) {
@@ -2028,16 +2133,6 @@
                 // Store all events for map (before any filtering)
                 allEventsForMap = [...events];
                 sortAndFilter();
-                
-                // Calculate totals and crew metrics, store for chart
-                const totalAffected = events.reduce((sum, e) => sum + (e.numPeople || 0), 0);
-                const totalOutages = events.length;
-                const assignedEvents = events.filter(e => e.status !== 'Unassigned');
-                const unassignedEvents = events.filter(e => e.status === 'Unassigned');
-                const activeCrews = assignedEvents.length;
-                const waitingForCrew = unassignedEvents.length;
-                const customersBeingRestored = assignedEvents.reduce((sum, e) => sum + (e.numPeople || 0), 0);
-                if (!CHART_DATA_URL) storeChartData(totalAffected, totalOutages, activeCrews, customersBeingRestored, waitingForCrew);
                 
                 // Update chart if visible
                 if (chartVisible && affectedCustomersChart) {
@@ -2500,86 +2595,17 @@
             saveSettings();
         }
 
-        // Round time to 10-minute interval
-        function roundTo10Minutes(date) {
-            const minutes = date.getMinutes();
-            const roundedMinutes = Math.floor(minutes / 10) * 10;
-            const rounded = new Date(date);
-            rounded.setMinutes(roundedMinutes, 0, 0);
-            return rounded;
-        }
-
-        // Store chart data point
-        function storeChartData(totalAffected, totalOutages, activeCrews, customersBeingRestored, waitingForCrew) {
-            const now = new Date();
-            const interval = roundTo10Minutes(now);
-            
-            // Get existing data
-            let chartData = [];
-            try {
-                const stored = localStorage.getItem(CHART_DATA_KEY);
-                if (stored) {
-                    chartData = JSON.parse(stored);
-                }
-            } catch (e) {
-                console.error('Error loading chart data:', e);
-            }
-
-            // Check if we already have data for this interval
-            const existingIndex = chartData.findIndex(d => {
-                const dTime = new Date(d.timestamp);
-                return dTime.getTime() === interval.getTime();
-            });
-
-            const dataPoint = {
-                timestamp: interval.toISOString(),
-                numPeople: totalAffected,
-                eventCount: totalOutages,
-                activeCrews: activeCrews,
-                customersBeingRestored: customersBeingRestored,
-                waitingForCrew: waitingForCrew
-            };
-
-            if (existingIndex >= 0) {
-                chartData[existingIndex] = dataPoint;
-            } else {
-                chartData.push(dataPoint);
-            }
-
-            // Sort by timestamp
-            chartData.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-
-            // Keep only last 2 months to avoid large data file
-            const cutoff = new Date();
-            cutoff.setMonth(cutoff.getMonth() - 2);
-            chartData = chartData.filter(d => new Date(d.timestamp) >= cutoff);
-
-            // Store back
-            try {
-                localStorage.setItem(CHART_DATA_KEY, JSON.stringify(chartData));
-            } catch (e) {
-                console.error('Error storing chart data:', e);
-            }
-        }
-
-        // Get chart data: from CHART_DATA_URL if set, else localStorage
+        // Get chart data from CHART_DATA_URL only (no local fallback)
         async function getChartData() {
-            if (CHART_DATA_URL) {
-                try {
-                    const response = await fetch(CHART_DATA_URL + (CHART_DATA_URL.indexOf('?') >= 0 ? '&' : '?') + '_=' + Date.now());
-                    if (response.ok) {
-                        const data = await response.json();
-                        return Array.isArray(data) ? data : [];
-                    }
-                } catch (e) {
-                    console.warn('Chart data from server failed, using localStorage if any:', e.message);
-                }
-            }
+            if (!CHART_DATA_URL) return [];
             try {
-                const stored = localStorage.getItem(CHART_DATA_KEY);
-                if (stored) return JSON.parse(stored);
+                const response = await fetch(CHART_DATA_URL + (CHART_DATA_URL.indexOf('?') >= 0 ? '&' : '?') + '_=' + Date.now());
+                if (response.ok) {
+                    const data = await response.json();
+                    return Array.isArray(data) ? data : [];
+                }
             } catch (e) {
-                console.error('Error loading chart data:', e);
+                console.warn('Chart data fetch failed:', e.message);
             }
             return [];
         }
@@ -2587,6 +2613,22 @@
         function changeChartMetric() {
             const select = document.getElementById('chartMetricSelect');
             chartMetric = select.value;
+            saveSettings();
+            renderChart();
+        }
+
+        function updateChartYRangeLabel(yMin) {
+            const label = document.getElementById('chartYRangeLabel');
+            if (!label) return;
+            if (yMin == null || yMin === 0) label.textContent = 'Y min: 0';
+            else label.textContent = 'Y min: ' + Number(yMin).toLocaleString();
+        }
+
+        function changeChartYRange() {
+            const slider = document.getElementById('chartYRangeSlider');
+            if (!slider) return;
+            chartYRange = parseInt(slider.value, 10);
+            updateChartYRangeLabel(chartYRange);
             saveSettings();
             renderChart();
         }
@@ -2643,6 +2685,19 @@
             const data = chartData.map(d => d[config.key] ?? 0);
             const label = config.label;
             const title = config.title;
+
+            // Y min: slider [0, max - 10% of max]
+            const dataMax = Math.max(...data);
+            const sliderMax = Math.floor(dataMax * 0.9);
+            const yMin = chartYRange == null ? 0 : Math.min(sliderMax, Math.max(0, chartYRange));
+            const sliderEl = document.getElementById('chartYRangeSlider');
+            if (sliderEl) {
+                sliderEl.min = 0;
+                sliderEl.max = sliderMax;
+                sliderEl.value = yMin;
+                sliderEl.step = Math.max(1, Math.ceil(sliderMax / 300));
+            }
+            updateChartYRangeLabel(yMin);
 
             // Update chart title
             document.getElementById('chartTitle').textContent = title;
@@ -2701,6 +2756,7 @@
                             }
                         },
                         y: {
+                            min: yMin,
                             ticks: {
                                 color: textColor,
                                 callback: function(value) {
@@ -2710,7 +2766,7 @@
                             grid: {
                                 color: gridColor
                             },
-                            beginAtZero: true
+                            beginAtZero: yMin === 0
                         }
                     }
                 }
