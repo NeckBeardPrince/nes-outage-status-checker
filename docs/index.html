@@ -10,6 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="shared-data.js"></script>
     <style>
         :root {
             /* Typography */
@@ -1749,6 +1750,7 @@
                 <div class="crews-map-toggle">
                     <!-- stopPropagation prevents click from toggling the collapsible map section -->
                     <button class="map-ctrl-btn" id="mapStyleBtn" onclick="event.stopPropagation(); cycleMapStyle()" title="Cycle map style (S)"><span class="btn-icon">&#x25D0;</span><span class="btn-text">Aerial</span></button>
+                    <button class="map-ctrl-btn" id="heatmapBtn" onclick="event.stopPropagation(); toggleEtaHeatmap()" title="Toggle ETA/reliability heatmap"><span class="btn-icon">🔥</span><span class="btn-text">Heatmap</span></button>
                     <button class="map-ctrl-btn" id="fullscreenBtn" onclick="event.stopPropagation(); toggleMapFullscreen()" title="Toggle fullscreen (F)"><span class="btn-icon">&#x2922;</span><span class="btn-text">Fullscreen</span></button>
                     <span id="crewsMapCount">0 crews</span>
                     <span class="crews-map-toggle-icon">&#9660;</span>
@@ -1877,6 +1879,8 @@
         const CREWS_MAP_KEY = 'nes-crews-map-collapsed';
         let crewsMap = null;
         let crewsMapMarkers = [];
+        let heatmapEnabled = false;
+        let heatmapCircles = [];
         let mapStyle = 'dark';
         let currentTileLayer = null;
         // Map tile providers: CartoDB for dark/light themes, ESRI for aerial/satellite
@@ -2182,6 +2186,78 @@
             } else {
                 document.exitFullscreen();
             }
+        }
+
+        function toggleEtaHeatmap() {
+            heatmapEnabled = !heatmapEnabled;
+            const btn = document.getElementById('heatmapBtn');
+            if (btn) {
+                btn.classList.toggle('active', heatmapEnabled);
+            }
+            
+            if (heatmapEnabled) {
+                renderReliabilityHeatmap();
+            } else {
+                clearReliabilityHeatmap();
+            }
+        }
+
+        function renderReliabilityHeatmap() {
+            if (!crewsMap) return;
+            
+            clearReliabilityHeatmap();
+            
+            // Get historical data from localStorage if available
+            try {
+                const historyData = JSON.parse(localStorage.getItem('nes-outage-history') || '[]');
+                if (historyData.length === 0) return;
+                
+                // Aggregate outages by zip code
+                const zipStats = {};
+                historyData.forEach(entry => {
+                    const zip = entry.zipCode || (entry.latitude && entry.longitude ? 
+                        findClosestZipCode(entry.latitude, entry.longitude) : null);
+                    if (zip) {
+                        if (!zipStats[zip]) {
+                            zipStats[zip] = { outages: 0, lat: entry.latitude, lon: entry.longitude };
+                        }
+                        zipStats[zip].outages++;
+                    }
+                });
+                
+                // Find max for color scaling
+                const maxOutages = Math.max(...Object.values(zipStats).map(z => z.outages || 0), 1);
+                
+                // Render circles for each zip code
+                Object.entries(zipStats).forEach(([zip, stats]) => {
+                    if (!stats.lat || !stats.lon) return;
+                    
+                    const ratio = stats.outages / maxOutages;
+                    const color = ratio > 0.7 ? '#EF4444' : ratio > 0.4 ? '#F59E0B' : '#10B981';
+                    const opacity = 0.3 + (ratio * 0.4);
+                    const radius = 1000 + (ratio * 4000); // 1-5km radius
+                    
+                    const circle = L.circle([stats.lat, stats.lon], {
+                        color: color,
+                        fillColor: color,
+                        fillOpacity: opacity,
+                        weight: 2,
+                        radius: radius
+                    }).bindPopup(`${getNeighborhoodName(zip)} (${zip})<br>${stats.outages} outages`);
+                    
+                    circle.addTo(crewsMap);
+                    heatmapCircles.push(circle);
+                });
+            } catch (e) {
+                console.error('Error rendering heatmap:', e);
+            }
+        }
+
+        function clearReliabilityHeatmap() {
+            heatmapCircles.forEach(circle => {
+                if (crewsMap) crewsMap.removeLayer(circle);
+            });
+            heatmapCircles = [];
         }
 
         document.addEventListener('fullscreenchange', () => {
