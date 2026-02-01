@@ -2574,11 +2574,7 @@
             `;
         }
 
-        const MAX_MONITORS = 4;
-
         function addMonitor(eventId = null, label = '', history = []) {
-            if (Object.keys(monitors).length >= MAX_MONITORS) return null;
-
             const id = monitorId++;
             monitors[id] = { eventId: null, previousStatus: null, history: history || [] };
 
@@ -2601,12 +2597,7 @@
         }
 
         function updateAddButton() {
-            const btn = document.querySelector('.add-monitor-btn');
-            if (Object.keys(monitors).length >= MAX_MONITORS) {
-                btn.classList.add('hidden');
-            } else {
-                btn.classList.remove('hidden');
-            }
+            // No limit on monitors
         }
 
         function removeMonitor(id) {
