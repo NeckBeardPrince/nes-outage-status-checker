@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="shared-data.js"></script>
     <style>
         :root {
             /* Typography */
@@ -1765,7 +1766,7 @@
         }
 
         // Historical data tracking for stats page
-        function saveEventHistory(events) {
+        async function saveEventHistory(events) {
             try {
                 const HISTORY_KEY = 'nes-outage-history';
                 let historyData = [];
@@ -1775,8 +1776,15 @@
                     historyData = JSON.parse(existing);
                 }
 
-                // Add or update events in history
-                events.forEach(event => {
+                // Add or update events in history with zip code
+                for (const event of events) {
+                    // Try to get zip code from event or use reverse geocoding
+                    let zipCode = event.zipCode;
+                    if (!zipCode && event.latitude && event.longitude) {
+                        // Use findClosestZipCode for instant lookup (rate-limit friendly)
+                        zipCode = findClosestZipCode(event.latitude, event.longitude);
+                    }
+                    
                     const entry = {
                         id: event.id,
                         title: event.title || 'Outage',
@@ -1786,6 +1794,8 @@
                         status: event.status,
                         latitude: event.latitude,
                         longitude: event.longitude,
+                        zipCode: zipCode,
+                        neighborhood: zipCode ? getNeighborhoodName(zipCode) : 'Unknown Area',
                         recordedAt: Date.now()
                     };
 
@@ -1796,7 +1806,7 @@
                     } else {
                         historyData.push(entry);
                     }
-                });
+                }
 
                 // Keep only last 365 days
                 const thirtyDaysAgo = Date.now() - (365 * 24 * 60 * 60 * 1000);

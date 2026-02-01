@@ -9,6 +9,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="shared-data.js"></script>
     <style>
         :root {
             /* Typography */
@@ -619,6 +620,15 @@
             </div>
         </section>
 
+        <!-- Time-of-Day Analysis -->
+        <section>
+            <h2>⏰ Outages by Hour of Day</h2>
+            <div class="chart-container">
+                <p style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0;">Identifies peak hours when outages most frequently occur</p>
+                <canvas id="hourlyChart" style="max-height: 300px;"></canvas>
+            </div>
+        </section>
+
         <footer>
             <a href="https://github.com/NeckBeardPrince/nes-outage-status-checker" target="_blank">GitHub</a>
             &middot;
@@ -634,17 +644,18 @@
         const SETTINGS_KEY = 'nes-stats-settings';
         let lightMode = false;
         let trendChart = null;
+        let hourlyChart = null;
         let currentLeaderboardType = 'unreliable';
         let historyData = [];
+        let cityAverageMetrics = null;
 
         function toggleTheme() {
             lightMode = !lightMode;
             document.body.classList.toggle('light-mode', lightMode);
             document.getElementById('themeBtn').textContent = lightMode ? 'Dark' : 'Light';
             localStorage.setItem('nes-stats-theme', lightMode ? 'light' : 'dark');
-            if (trendChart) {
-                renderTrendChart();
-            }
+            if (trendChart) renderTrendChart();
+            if (hourlyChart) renderHourlyChart();
         }
 
         function loadTheme() {
@@ -659,60 +670,24 @@
         function loadHistoryData() {
             try {
                 const data = localStorage.getItem(HISTORY_KEY);
-                if (data) {
-                    historyData = JSON.parse(data);
-                } else {
-                    historyData = [];
-                }
+                historyData = data ? JSON.parse(data) : [];
             } catch {
                 historyData = [];
             }
-        }
-
-        function addHistoryEntry(event) {
-            const entry = {
-                id: event.id,
-                title: event.title || 'Outage',
-                numPeople: event.numPeople,
-                startTime: event.startTime,
-                lastUpdatedTime: event.lastUpdatedTime,
-                status: event.status,
-                latitude: event.latitude,
-                longitude: event.longitude,
-                recordedAt: Date.now()
-            };
-
-            // Check if this is a new or updated entry
-            const existingIndex = historyData.findIndex(h => h.id === event.id);
-            if (existingIndex >= 0) {
-                historyData[existingIndex] = entry;
-            } else {
-                historyData.push(entry);
-            }
-
-            // Keep only last 365 days of history
-            const thirtyDaysAgo = Date.now() - (365 * 24 * 60 * 60 * 1000);
-            historyData = historyData.filter(h => h.recordedAt > thirtyDaysAgo);
-
-            localStorage.setItem(HISTORY_KEY, JSON.stringify(historyData));
         }
 
         function getAreaStats() {
             const areaMap = {};
 
             historyData.forEach(entry => {
-                // Try to determine area from coordinates or use a generic one
-                let areaName = 'Unknown Area';
-                if (entry.latitude && entry.longitude) {
-                    // Simplified zip code approximation from coordinates
-                    const rounded_lat = Math.round(entry.latitude * 10) / 10;
-                    const rounded_lon = Math.round(entry.longitude * 10) / 10;
-                    areaName = `${rounded_lat}, ${rounded_lon}`;
-                }
+                // Use zip code from entry (now captured in all.html)
+                const zipCode = entry.zipCode || findClosestZipCode(entry.latitude, entry.longitude);
+                const neighborhood = getNeighborhoodName(zipCode);
 
-                if (!areaMap[areaName]) {
-                    areaMap[areaName] = {
-                        name: areaName,
+                if (!areaMap[zipCode]) {
+                    areaMap[zipCode] = {
+                        zipCode: zipCode,
+                        name: neighborhood,
                         outages: 0,
                         totalDuration: 0,
                         totalAffected: 0,
@@ -722,32 +697,47 @@
                 }
 
                 const duration = (entry.lastUpdatedTime - entry.startTime) / (1000 * 60 * 60);
-                areaMap[areaName].outages++;
-                areaMap[areaName].totalDuration += duration;
-                areaMap[areaName].totalAffected += entry.numPeople;
-                areaMap[areaName].lastOutage = Math.max(areaMap[areaName].lastOutage, entry.recordedAt);
-                areaMap[areaName].incidents.push(entry);
+                areaMap[zipCode].outages++;
+                areaMap[zipCode].totalDuration += duration;
+                areaMap[zipCode].totalAffected += entry.numPeople;
+                areaMap[zipCode].lastOutage = Math.max(areaMap[zipCode].lastOutage, entry.recordedAt);
+                areaMap[zipCode].incidents.push(entry);
             });
 
-            // Calculate trends
+            // Calculate derived metrics
             Object.values(areaMap).forEach(area => {
                 area.avgDuration = area.totalDuration / area.outages;
-                area.reliability = (area.totalAffected / area.outages).toFixed(1);
+                area.avgAffected = area.totalAffected / area.outages;
+                area.reliabilityScore = calculateReliabilityScore(area);
 
-                // Calculate trend (improving vs worsening)
+                // Calculate trend (30-day window)
                 if (area.incidents.length > 1) {
                     const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
                     const recentOutages = area.incidents.filter(i => i.recordedAt > thirtyDaysAgo).length;
-                    const trendIndicator = (recentOutages / area.outages);
+                    const trendIndicator = recentOutages / area.outages;
                     area.trend = trendIndicator > 0.3 ? 'worsening' : 'improving';
                     area.trendValue = `${trendIndicator > 0.3 ? '↑' : '↓'} ${Math.round(trendIndicator * 100)}%`;
                 } else {
                     area.trend = 'neutral';
                     area.trendValue = '—';
                 }
+
+                // Predictive insights
+                const avgMetrics = calculateCityAverage(Object.values(areaMap));
+                const comparison = compareToAverage(area, Object.values(areaMap));
+                area.comparison = comparison;
             });
 
             return areaMap;
+        }
+
+        function calculateCityAverage(areas) {
+            if (areas.length === 0) return { avgOutages: 0, avgDuration: 0 };
+            return {
+                avgOutages: areas.reduce((s, a) => s + a.outages, 0) / areas.length,
+                avgDuration: areas.reduce((s, a) => s + a.avgDuration, 0) / areas.length,
+                avgAffected: areas.reduce((s, a) => s + a.totalAffected, 0) / areas.length
+            };
         }
 
         function getLeaderboardData(type) {
@@ -756,8 +746,7 @@
 
             switch (type) {
                 case 'unreliable':
-                    // Combination metric: frequency × avg affected
-                    return areas.sort((a, b) => (b.outages * b.reliability) - (a.outages * a.reliability));
+                    return areas.sort((a, b) => (b.outages * b.avgAffected) - (a.outages * a.avgAffected));
                 case 'frequent':
                     return areas.sort((a, b) => b.outages - a.outages);
                 case 'duration':
@@ -797,24 +786,25 @@
                         break;
                     case 'unreliable':
                     default:
-                        metric = `${area.reliability} avg affected`;
+                        metric = `${area.avgAffected.toFixed(0)} avg affected`;
                         trendArrow = area.trend === 'improving' ? '↓' : area.trend === 'worsening' ? '↑' : '—';
                 }
 
                 const trendClass = trendArrow === '↓' ? 'down' : trendArrow === '↑' ? 'up' : 'neutral';
+                const comparisonIcon = area.comparison?.factor > 1.2 ? '📈' : area.comparison?.factor < 0.8 ? '📉' : '➡️';
 
                 return `
                     <div class="leaderboard-item">
                         <div class="leaderboard-rank">
                             <span class="rank-badge">${badges[index] || ''}</span>
                             <div class="rank-info">
-                                <div class="rank-name">${area.name}</div>
+                                <div class="rank-name">${area.name} (${area.zipCode})</div>
                                 <div class="rank-detail">${metric}</div>
                             </div>
                         </div>
                         <div class="rank-trend">
                             <span class="trend-arrow ${trendClass}">${trendArrow}</span>
-                            <span class="trend-value">${(area.outages * area.reliability).toFixed(0)}</span>
+                            <span class="trend-value">${comparisonIcon} ${(area.outages * area.avgAffected).toFixed(0)}</span>
                         </div>
                     </div>
                 `;
@@ -832,7 +822,13 @@
             const areaStats = getAreaStats();
             const areas = Object.values(areaStats);
 
-            // Calculate overall stats
+            if (areas.length === 0) {
+                document.getElementById('leaderboardContainer').innerHTML = 
+                    '<div class="no-data">No data available yet. Visit the Monitor page to start collecting statistics.</div>';
+                return;
+            }
+
+            // Overall stats
             const totalOutages = historyData.length;
             const totalDuration = areas.reduce((sum, a) => sum + a.totalDuration, 0);
             const totalAffected = areas.reduce((sum, a) => sum + a.totalAffected, 0);
@@ -843,9 +839,9 @@
             document.getElementById('totalAffected').textContent = totalAffected.toLocaleString();
             document.getElementById('activeDays').textContent = activeDays;
 
-            // Render top unreliable areas
+            // Top unreliable areas
             const topAreas = [...areas]
-                .sort((a, b) => (b.outages * b.reliability) - (a.outages * a.reliability))
+                .sort((a, b) => (b.outages * b.avgAffected) - (a.outages * a.avgAffected))
                 .slice(0, 10);
 
             const topAreasHtml = topAreas.map(area => `
@@ -861,12 +857,12 @@
                             <div class="stat-number">${area.avgDuration.toFixed(1)}h</div>
                         </div>
                         <div class="stat-box">
-                            <div class="stat-label">Affected</div>
-                            <div class="stat-number">${area.totalAffected}</div>
+                            <div class="stat-label">Avg Affected</div>
+                            <div class="stat-number">${area.avgAffected.toFixed(0)}</div>
                         </div>
                     </div>
                     <div class="badge ${area.trend}">
-                        ${area.trendValue}
+                        ${area.comparison.percentageDiff > 0 ? '+' : ''}${area.comparison.percentageDiff}% vs avg ${area.comparison.rating}
                     </div>
                 </div>
             `).join('');
@@ -875,32 +871,26 @@
 
             renderLeaderboard(currentLeaderboardType);
             renderTrendChart();
+            renderHourlyChart();
         }
 
         function renderTrendChart() {
             const ctx = document.getElementById('trendChart');
             if (!ctx) return;
 
-            // Group outages by week
             const weekMap = {};
             historyData.forEach(entry => {
                 const date = new Date(entry.recordedAt);
                 const weekStart = new Date(date);
                 weekStart.setDate(date.getDate() - date.getDay());
                 const weekKey = weekStart.toISOString().split('T')[0];
-
-                if (!weekMap[weekKey]) {
-                    weekMap[weekKey] = 0;
-                }
-                weekMap[weekKey]++;
+                weekMap[weekKey] = (weekMap[weekKey] || 0) + 1;
             });
 
             const weeks = Object.keys(weekMap).sort();
             const counts = weeks.map(w => weekMap[w]);
 
-            if (trendChart) {
-                trendChart.destroy();
-            }
+            if (trendChart) trendChart.destroy();
 
             trendChart = new Chart(ctx, {
                 type: 'line',
@@ -922,36 +912,51 @@
                 options: {
                     responsive: true,
                     maintainAspectRatio: true,
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
-                    },
+                    plugins: { legend: { display: false } },
                     scales: {
-                        y: {
-                            beginAtZero: true,
-                            grid: {
-                                color: 'rgba(168, 162, 158, 0.1)'
-                            },
-                            ticks: {
-                                color: 'var(--text-secondary)'
-                            }
-                        },
-                        x: {
-                            grid: {
-                                display: false
-                            },
-                            ticks: {
-                                color: 'var(--text-secondary)'
-                            }
-                        }
+                        y: { beginAtZero: true, grid: { color: 'rgba(168, 162, 158, 0.1)' }, ticks: { color: 'var(--text-secondary)' } },
+                        x: { grid: { display: false }, ticks: { color: 'var(--text-secondary)' } }
+                    }
+                }
+            });
+        }
+
+        function renderHourlyChart() {
+            const ctx = document.getElementById('hourlyChart');
+            if (!ctx) return;
+
+            const hourMap = getHourlyDistribution(historyData);
+            const hours = Object.keys(hourMap).map(Number);
+            const counts = hours.map(h => hourMap[h]);
+
+            if (hourlyChart) hourlyChart.destroy();
+
+            hourlyChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: hours.map(h => `${h}:00`),
+                    datasets: [{
+                        label: 'Outages by Hour',
+                        data: counts,
+                        backgroundColor: 'rgba(16, 185, 129, 0.7)',
+                        borderColor: '#10B981',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: 'rgba(168, 162, 158, 0.1)' }, ticks: { color: 'var(--text-secondary)' } },
+                        x: { grid: { display: false }, ticks: { color: 'var(--text-secondary)' } }
                     }
                 }
             });
         }
 
         function searchZipCode() {
-            const zipCode = document.getElementById('zipCodeInput').value;
+            const zipCode = document.getElementById('zipCodeInput').value.trim().substring(0, 5);
             const resultEl = document.getElementById('searchResult');
 
             if (!zipCode) {
@@ -959,51 +964,55 @@
                 return;
             }
 
-            // Simple pattern matching - look for outages in that general area
             const areaStats = getAreaStats();
-            const matchingAreas = Object.values(areaStats).filter(area => 
-                area.name.includes(zipCode.substring(0, 3))
-            );
+            const area = areaStats[zipCode];
 
-            if (matchingAreas.length === 0) {
-                resultEl.innerHTML = `<div class="search-result">No outage history found for ${zipCode} area. Try a different zip code.</div>`;
-            } else {
-                const area = matchingAreas[0];
-                const improvement = area.trend === 'improving' ? '✅ Improving' : area.trend === 'worsening' ? '⚠️ Worsening' : '➡️ Stable';
-                resultEl.innerHTML = `
-                    <div class="search-result">
-                        <strong>${area.name}</strong><br>
-                        Your area averages <strong>${area.outages}</strong> outages/year<br>
-                        Average duration: <strong>${area.avgDuration.toFixed(1)} hours</strong><br>
-                        Trend: ${improvement}
-                    </div>
-                `;
+            if (!area) {
+                resultEl.innerHTML = `<div class="search-result">❌ No data for ${zipCode}. Available: ${Object.keys(areaStats).slice(0, 5).join(', ')}...</div>`;
+                return;
             }
+
+            const trend = area.trend === 'improving' ? '✅ Improving' : area.trend === 'worsening' ? '⚠️ Worsening' : '➡️ Stable';
+            const compared = area.comparison.factor > 1.2 
+                ? `${Math.round((area.comparison.factor - 1) * 100)}% WORSE than average`
+                : area.comparison.factor < 0.8
+                ? `${Math.round((1 - area.comparison.factor) * 100)}% BETTER than average`
+                : 'About average';
+
+            resultEl.innerHTML = `
+                <div class="search-result">
+                    <strong>${area.name} (${zipCode})</strong><br>
+                    Outages: <strong>${area.outages}</strong> | Avg Duration: <strong>${area.avgDuration.toFixed(1)}h</strong><br>
+                    Affected: <strong>${area.avgAffected.toFixed(0)} people/outage</strong><br>
+                    Trend: ${trend} | Reliability vs City: ${compared}<br>
+                    <button class="search-btn" onclick="exportAreaCSV('${zipCode}')">📥 Export ${zipCode} History</button>
+                </div>
+            `;
         }
 
-        function syncWithMainPage() {
-            // Try to get the latest events from the all.html page (if it's been visited)
-            // This would typically be fetched from localStorage or the API
-            // For now, we'll just load stored history
-            loadHistoryData();
+        function exportAreaCSV(zipCode) {
+            const csv = exportToCSV(historyData, zipCode);
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `nes-outages-${zipCode}-${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            window.URL.revokeObjectURL(url);
         }
 
         function init() {
             loadTheme();
-            syncWithMainPage();
-            
+            loadHistoryData();
             if (historyData.length > 0) {
                 updateStats();
             } else {
                 document.getElementById('leaderboardContainer').innerHTML = 
-                    '<div class="no-data">No data available yet. Visit the Monitor or All Outages pages first to start collecting statistics.</div>';
+                    '<div class="no-data">No data available yet. Visit the Monitor page to start collecting statistics.</div>';
             }
         }
 
-        // Initialize on page load
         document.addEventListener('DOMContentLoaded', init);
-
-        // Allow Enter key in search input
         document.getElementById('zipCodeInput')?.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') searchZipCode();
         });
