@@ -629,6 +629,28 @@
             </div>
         </section>
 
+        <!-- Worst Month Report -->
+        <section>
+            <h2>📅 Worst Month Report</h2>
+            <div id="worstMonthContainer" class="grid">
+                <div class="no-data">Loading monthly analysis...</div>
+            </div>
+        </section>
+
+        <!-- Zip Code Comparison -->
+        <section>
+            <h2>🔍 Compare Two Areas</h2>
+            <div class="search-section">
+                <div class="search-title">Side-by-side Reliability Comparison</div>
+                <div class="search-input-group" style="gap: 12px;">
+                    <input type="text" id="compareZip1" class="search-input" placeholder="First zip code (e.g., 37201)" />
+                    <input type="text" id="compareZip2" class="search-input" placeholder="Second zip code (e.g., 37205)" />
+                    <button class="search-btn" onclick="compareZipCodes()">Compare</button>
+                </div>
+                <div id="comparisonResult"></div>
+            </div>
+        </section>
+
         <footer>
             <a href="https://github.com/NeckBeardPrince/nes-outage-status-checker" target="_blank">GitHub</a>
             &middot;
@@ -1001,20 +1023,150 @@
             window.URL.revokeObjectURL(url);
         }
 
+        function renderWorstMonthReport() {
+            const monthlySummary = getMonthlySummary(historyData);
+            if (Object.keys(monthlySummary).length === 0) {
+                document.getElementById('worstMonthContainer').innerHTML = 
+                    '<div class="no-data">No monthly data available yet.</div>';
+                return;
+            }
+
+            const worst = findWorstMonth(monthlySummary);
+            if (!worst) return;
+
+            const formatMonth = (monthStr) => {
+                const [year, month] = monthStr.split('-');
+                return new Date(year, month - 1).toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+            };
+
+            const worstOutagesMonth = worst.outages[0];
+            const worstDurationMonth = worst.duration[0];
+            const worstImpactMonth = worst.impact[0];
+
+            const html = `
+                <div class="card">
+                    <div class="card-title">📈 Most Outages</div>
+                    <div class="card-value">${worst.outages[1].outages}</div>
+                    <div class="card-subtitle">${formatMonth(worstOutagesMonth)}</div>
+                    <div style="margin-top: 12px; font-size: 0.875rem; color: var(--text-secondary);">
+                        Avg: <strong>${worst.outages[1].avgDuration.toFixed(1)}h</strong> | 
+                        Affected: <strong>${worst.outages[1].avgAffected}</strong> people/outage
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">⏱️ Longest Outages</div>
+                    <div class="card-value">${worst.duration[1].avgDuration.toFixed(1)}h</div>
+                    <div class="card-subtitle">${formatMonth(worstDurationMonth)}</div>
+                    <div style="margin-top: 12px; font-size: 0.875rem; color: var(--text-secondary);">
+                        Count: <strong>${worst.duration[1].outages}</strong> | 
+                        Total: <strong>${worst.duration[1].totalDuration.toFixed(1)}h</strong>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">👥 Highest Impact</div>
+                    <div class="card-value">${worst.impact[1].totalAffected.toLocaleString()}</div>
+                    <div class="card-subtitle">${formatMonth(worstImpactMonth)}</div>
+                    <div style="margin-top: 12px; font-size: 0.875rem; color: var(--text-secondary);">
+                        Outages: <strong>${worst.impact[1].outages}</strong> | 
+                        Avg: <strong>${worst.impact[1].avgAffected}</strong> people
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('worstMonthContainer').innerHTML = html;
+        }
+
+        function compareZipCodes() {
+            const zip1 = document.getElementById('compareZip1').value.trim().substring(0, 5);
+            const zip2 = document.getElementById('compareZip2').value.trim().substring(0, 5);
+            const resultEl = document.getElementById('comparisonResult');
+
+            if (!zip1 || !zip2) {
+                resultEl.innerHTML = '<div class="search-result">❌ Please enter both zip codes</div>';
+                return;
+            }
+
+            if (zip1 === zip2) {
+                resultEl.innerHTML = '<div class="search-result">❌ Please choose different zip codes</div>';
+                return;
+            }
+
+            const areaStats = getAreaStats();
+            const area1 = areaStats[zip1];
+            const area2 = areaStats[zip2];
+
+            if (!area1 || !area2) {
+                resultEl.innerHTML = `<div class="search-result">❌ One or both zip codes not found in data</div>`;
+                return;
+            }
+
+            const betterArea = area1.reliabilityScore > area2.reliabilityScore ? area1 : area2;
+            const worseArea = betterArea === area1 ? area2 : area1;
+            const scoreDiff = Math.abs(area1.reliabilityScore - area2.reliabilityScore);
+            const reliabilityDiff = ((worseArea.outages - betterArea.outages) / betterArea.outages * 100).toFixed(0);
+
+            const html = `
+                <div class="search-result">
+                    <strong>${area1.name} (${zip1})</strong> vs <strong>${area2.name} (${zip2})</strong><br><br>
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr style="border-bottom: 1px solid rgba(168, 162, 158, 0.15);">
+                            <td style="padding: 8px 0;"><strong>Metric</strong></td>
+                            <td style="padding: 8px 0; text-align: center;"><strong>${area1.name}</strong></td>
+                            <td style="padding: 8px 0; text-align: center;"><strong>${area2.name}</strong></td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid rgba(168, 162, 158, 0.15);">
+                            <td style="padding: 8px 0;">Outages</td>
+                            <td style="padding: 8px 0; text-align: center; color: ${area1.outages <= area2.outages ? '#10B981' : '#EF4444'}">${area1.outages}</td>
+                            <td style="padding: 8px 0; text-align: center; color: ${area2.outages <= area1.outages ? '#10B981' : '#EF4444'}">${area2.outages}</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid rgba(168, 162, 158, 0.15);">
+                            <td style="padding: 8px 0;">Avg Duration</td>
+                            <td style="padding: 8px 0; text-align: center; color: ${area1.avgDuration <= area2.avgDuration ? '#10B981' : '#EF4444'}">${area1.avgDuration.toFixed(1)}h</td>
+                            <td style="padding: 8px 0; text-align: center; color: ${area2.avgDuration <= area1.avgDuration ? '#10B981' : '#EF4444'}">${area2.avgDuration.toFixed(1)}h</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid rgba(168, 162, 158, 0.15);">
+                            <td style="padding: 8px 0;">Avg Affected</td>
+                            <td style="padding: 8px 0; text-align: center; color: ${area1.avgAffected <= area2.avgAffected ? '#10B981' : '#EF4444'}">${area1.avgAffected.toFixed(0)}</td>
+                            <td style="padding: 8px 0; text-align: center; color: ${area2.avgAffected <= area1.avgAffected ? '#10B981' : '#EF4444'}">${area2.avgAffected.toFixed(0)}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0;"><strong>Reliability Score</strong></td>
+                            <td style="padding: 8px 0; text-align: center; font-weight: bold; color: ${area1.reliabilityScore > area2.reliabilityScore ? '#10B981' : '#EF4444'}">${area1.reliabilityScore}/100</td>
+                            <td style="padding: 8px 0; text-align: center; font-weight: bold; color: ${area2.reliabilityScore > area1.reliabilityScore ? '#10B981' : '#EF4444'}">${area2.reliabilityScore}/100</td>
+                        </tr>
+                    </table><br>
+                    <div style="padding: 12px; background: rgba(249, 115, 22, 0.1); border-radius: 8px; font-size: 0.875rem;">
+                        <strong>${betterArea.name}</strong> is ${Math.abs(reliabilityDiff)}% more reliable than <strong>${worseArea.name}</strong>
+                    </div>
+                </div>
+            `;
+
+            resultEl.innerHTML = html;
+        }
+
         function init() {
             loadTheme();
             loadHistoryData();
             if (historyData.length > 0) {
                 updateStats();
+                renderWorstMonthReport();
             } else {
                 document.getElementById('leaderboardContainer').innerHTML = 
                     '<div class="no-data">No data available yet. Visit the Monitor page to start collecting statistics.</div>';
+                document.getElementById('worstMonthContainer').innerHTML = 
+                    '<div class="no-data">No monthly data available.</div>';
             }
         }
 
         document.addEventListener('DOMContentLoaded', init);
         document.getElementById('zipCodeInput')?.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') searchZipCode();
+        });
+        document.getElementById('compareZip1')?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') compareZipCodes();
+        });
+        document.getElementById('compareZip2')?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') compareZipCodes();
         });
     </script>
 </body>
