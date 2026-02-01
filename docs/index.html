@@ -1682,6 +1682,7 @@
             </div>
             <div class="header-links">
                 <a href="all.html" class="header-link">All Outages</a>
+                <a href="stats.html" class="header-link">Stats</a>
                 <a href="how-it-works.html" class="header-link">How It Works</a>
             </div>
         </header>
@@ -1972,6 +1973,50 @@
             document.body.classList.toggle('colorblind-mode', colorblindMode);
             if (compactView) {
                 document.querySelectorAll('.result').forEach(el => el.classList.add('compact'));
+            }
+        }
+
+        // Historical data tracking for stats page
+        function saveEventHistory(events) {
+            try {
+                const HISTORY_KEY = 'nes-outage-history';
+                let historyData = [];
+                
+                const existing = localStorage.getItem(HISTORY_KEY);
+                if (existing) {
+                    historyData = JSON.parse(existing);
+                }
+
+                // Add or update events in history
+                events.forEach(event => {
+                    const entry = {
+                        id: event.id,
+                        title: event.title || 'Outage',
+                        numPeople: event.numPeople,
+                        startTime: event.startTime,
+                        lastUpdatedTime: event.lastUpdatedTime,
+                        status: event.status,
+                        latitude: event.latitude,
+                        longitude: event.longitude,
+                        recordedAt: Date.now()
+                    };
+
+                    // Check if this is an update
+                    const existingIndex = historyData.findIndex(h => h.id === event.id);
+                    if (existingIndex >= 0) {
+                        historyData[existingIndex] = entry;
+                    } else {
+                        historyData.push(entry);
+                    }
+                });
+
+                // Keep only last 365 days
+                const thirtyDaysAgo = Date.now() - (365 * 24 * 60 * 60 * 1000);
+                historyData = historyData.filter(h => h.recordedAt > thirtyDaysAgo);
+
+                localStorage.setItem(HISTORY_KEY, JSON.stringify(historyData));
+            } catch (e) {
+                console.log('Error saving event history:', e);
             }
         }
 
@@ -2375,6 +2420,9 @@
                 if (!response.ok) return;
 
                 const events = await response.json();
+
+                // Save event history for stats page
+                saveEventHistory(events);
 
                 // Update dashboard stats
                 updateDashboardStats(events);
