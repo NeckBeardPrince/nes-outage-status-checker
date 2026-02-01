@@ -1429,6 +1429,7 @@
                         Where Crews Are Working
                     </div>
                     <div class="map-header-controls">
+                        <button class="map-ctrl-btn" id="etaBtn" onclick="toggleETALayer()" title="Toggle ETA heatmap (E)"><span class="btn-icon">⏱️</span><span class="btn-text">ETA</span></button>
                         <button class="map-ctrl-btn" id="weatherBtn" onclick="toggleWeatherLayer()" title="Toggle weather overlay (W)"><span class="btn-icon">⛈️</span><span class="btn-text">Weather</span></button>
                         <button class="map-ctrl-btn" id="mapStyleBtn" onclick="cycleMapStyle()" title="Cycle map style (S)"><span class="btn-icon">&#x25D0;</span><span class="btn-text">Aerial</span></button>
                         <button class="map-ctrl-btn" id="fullscreenBtn" onclick="toggleMapFullscreen()" title="Toggle fullscreen (F)"><span class="btn-icon">&#x2922;</span><span class="btn-text">Fullscreen</span></button>
@@ -1450,6 +1451,30 @@
                         <input type="checkbox" id="showWaitingToggle" onchange="toggleShowWaiting()">
                         <span class="map-toggle-label">Show Waiting</span>
                     </label>
+                    <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-color);">
+                        <div class="legend-title">ETA</div>
+                        <div style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 8px;">Estimated Restoration Time</div>
+                        <div class="legend-item">
+                            <span class="legend-dot" style="background: #10B981; border-color: #059669;"></span>
+                            <span>&lt;1 hour</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-dot" style="background: #F59E0B; border-color: #D97706;"></span>
+                            <span>1-3 hours</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-dot" style="background: #F97316; border-color: #EA580C;"></span>
+                            <span>3-6 hours</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-dot" style="background: #EF4444; border-color: #DC2626;"></span>
+                            <span>&gt;6 hours</span>
+                        </div>
+                        <label class="map-toggle">
+                            <input type="checkbox" id="etaToggle" onchange="toggleETALayer()">
+                            <span class="map-toggle-label">Show ETA Heatmap</span>
+                        </label>
+                    </div>
                     <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-color);">
                         <div class="legend-title">Weather</div>
                         <div style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 8px;">Wind, precipitation, temperature</div>
@@ -1482,7 +1507,7 @@
             <a href="https://github.com/NeckBeardPrince/nes-outage-status-checker" target="_blank">GitHub</a>
             &middot;
             <a href="https://github.com/NeckBeardPrince/nes-outage-status-checker/blob/main/CHANGELOG.md" target="_blank">Changelog</a>
-            <div class="keyboard-hint">Keyboard: R=Refresh, N=Notify, T=Theme, M=Map, S=Style, W=Weather, F=Fullscreen, H=History</div>
+            <div class="keyboard-hint">Keyboard: R=Refresh, N=Notify, T=Theme, M=Map, S=Style, E=ETA, W=Weather, F=Fullscreen, H=History</div>
             <div class="built-with">
                 Built by <a href="https://iamadam.dev/" target="_blank" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-decoration: none; font-weight: 700;">Adam</a>
                 <span style="margin: 0 6px; color: #666;">+</span>
@@ -1583,6 +1608,8 @@
         let showWeather = false;
         let weatherLayer = null;
         let weatherData = {};
+        let showETA = false;
+        let etaMarkers = [];
         // Map tile providers: CartoDB for dark/light themes, ESRI for aerial/satellite
         // subdomains 'abcd' enables parallel tile loading from CDN (not used by ESRI)
         const tileLayers = {
@@ -1590,6 +1617,48 @@
             light: { url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', subdomains: 'abcd' },
             aerial: { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', subdomains: null }
         };
+
+        // ETA color mapping: green <1hr, yellow 1-3hrs, orange 3-6hrs, red >6hrs
+        const etaColors = {
+            'critical': '#EF4444',      // red - >6 hours
+            'high': '#F97316',          // orange - 3-6 hours
+            'medium': '#F59E0B',        // yellow - 1-3 hours
+            'low': '#10B981'            // green - <1 hour
+        };
+
+        function estimateETA(event) {
+            // Estimate restoration time based on status, outage duration, and size
+            const durationHours = (Date.now() - event.startTime) / (1000 * 60 * 60);
+            const isAssigned = event.status !== 'Unassigned';
+
+            // Base formula: longer outages and larger outages take longer
+            // Assigned outages are estimated to be resolved faster
+            let estimatedHours;
+            if (isAssigned) {
+                // Assigned: base 0.5-2 hours depending on duration and size
+                const sizeMultiplier = Math.min(event.numPeople / 500, 2);
+                estimatedHours = 0.5 + (durationHours * 0.1) + (sizeMultiplier * 0.3);
+            } else {
+                // Unassigned: longer estimates, base 1-4 hours
+                const sizeMultiplier = Math.min(event.numPeople / 300, 2.5);
+                estimatedHours = 1 + (durationHours * 0.15) + (sizeMultiplier * 0.5);
+            }
+
+            return Math.min(Math.max(estimatedHours, 0.5), 24); // Cap at 0.5-24 hours
+        }
+
+        function getETACategory(hours) {
+            if (hours < 1) return { category: 'low', label: '<1 hour', color: etaColors.low };
+            if (hours < 3) return { category: 'medium', label: '1-3 hours', color: etaColors.medium };
+            if (hours < 6) return { category: 'high', label: '3-6 hours', color: etaColors.high };
+            return { category: 'critical', label: '>6 hours', color: etaColors.critical };
+        }
+
+        function formatETA(hours) {
+            if (hours < 1) return `${Math.round(hours * 60)} min`;
+            if (hours < 2) return `${Math.round(hours * 60)} min`;
+            return `${Math.round(hours)} h`;
+        }
 
         function playNotificationSound() {
             if (!soundEnabled) return;
@@ -1621,7 +1690,8 @@
                 colorblindMode,
                 chartVisible,
                 chartMetric,
-                showWeather
+                showWeather,
+                showETA
             }));
             localStorage.setItem('nes-map-style', mapStyle);
         }
@@ -1639,6 +1709,7 @@
                     chartVisible = settings.chartVisible || false;
                     chartMetric = settings.chartMetric || 'customers';
                     showWeather = settings.showWeather || false;
+                    showETA = settings.showETA || false;
                 }
                 const savedMapStyle = localStorage.getItem('nes-map-style');
                 if (savedMapStyle && tileLayers[savedMapStyle]) mapStyle = savedMapStyle;
@@ -1654,6 +1725,12 @@
                 const weatherToggle = document.getElementById('weatherToggle');
                 if (weatherToggle) {
                     weatherToggle.checked = showWeather;
+                }
+                
+                // Restore ETA toggle
+                const etaToggle = document.getElementById('etaToggle');
+                if (etaToggle) {
+                    etaToggle.checked = showETA;
                 }
                 
                 // Restore chart view if it was visible
@@ -1778,6 +1855,7 @@
                 case 't': toggleTheme(); break;
                 case 'm': setView(currentView === 'map' ? 'grid' : 'map'); break;
                 case 's': cycleMapStyle(); break;
+                case 'e': if (currentView === 'map' || map) toggleETALayer(); break;
                 case 'w': if (currentView === 'map' || map) toggleWeatherLayer(); break;
                 case 'f': if (currentView === 'map') toggleMapFullscreen(); break;
                 case 'h': toggleHistoryModal(); break;
@@ -2524,6 +2602,19 @@
             }
         }
 
+        function toggleETALayer() {
+            showETA = !showETA;
+            const btn = document.getElementById('etaBtn');
+            const toggle = document.getElementById('etaToggle');
+            if (btn) btn.classList.toggle('active', showETA);
+            if (toggle) toggle.checked = showETA;
+            
+            if (map) {
+                updateMapMarkers();
+            }
+            saveSettings();
+        }
+
         async function fetchWeatherData() {
             // Get Nashville center coordinates
             const lat = 36.1627;
@@ -2582,6 +2673,18 @@
                 <div class="popup-field"><strong>Started:</strong> ${formatDate(event.startTime)}</div>
                 <div class="popup-field"><strong>Duration:</strong> ${formatDuration(event.startTime)}</div>
             `;
+            
+            // Add ETA if enabled
+            if (showETA) {
+                const etaHours = estimateETA(event);
+                const etaInfo = getETACategory(etaHours);
+                popup += `
+                    <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-color); font-size: 0.85rem;">
+                        <strong style="color: ${etaInfo.color};">📊 Estimated Restoration</strong><br>
+                        <span style="color: ${etaInfo.color}; font-weight: 600;">${formatETA(etaHours)}</span> (${etaInfo.label})
+                    </div>
+                `;
+            }
             
             // Add weather context if available
             if (showWeather && Object.keys(weatherData).length > 0) {
