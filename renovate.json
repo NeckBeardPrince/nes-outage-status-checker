@@ -1,11 +1,121 @@
 {
+  // Schema validation for IDE support and error checking
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"],
+
+  // Start with Renovate's opinionated best practices as baseline
+  "extends": ["config:best-practices"],
+
+  // === ASSIGNMENT & REVIEW ===
+  // Who gets assigned to dependency PRs
+  "assignees": ["NeckBeardPrince"],
+  // Who reviews the PRs (copilot = GitHub Copilot review)
+  "reviewers": ["copilot"],
+
+  // === SCHEDULING & TIMING ===
+  // Use your actual timezone for better scheduling
+  "timezone": "America/Chicago",
+  // Only run updates on weekend mornings (less disruptive)
+  "schedule": ["after 9am every weekend"],
+  // Wait 7 days after release before updating (let others find the bugs first)
+  "minimumReleaseAge": "7 days",
+
+  // === PERFORMANCE & CI OPTIMIZATION ===
+  // Limit concurrent PRs to avoid overwhelming CI
+  "prConcurrentLimit": 3,
+  "branchConcurrentLimit": 5,
+  // Don't spam PRs if CI is broken
+  "stopUpdatingLabel": "stop-updates",
+  "rebaseWhen": "behind-base-branch",
+
+  // === PR CUSTOMIZATION ===
+  // Better commit messages and PR titles
+  "commitMessageTopic": "{{depName}}",
+  "commitMessageExtra": "({{currentVersion}} → {{newVersion}})",
+  // "prTitle": "⬆️ {{commitMessageTopic}}{{{commitMessageExtra}}}",
+  // Include changelogs in PRs for better context
+  "fetchChangeLogs": "pr",
+
+  // === DEPENDENCY DASHBOARD ===
+  // Get a nice overview issue with all pending updates
+  "dependencyDashboard": true,
+  "dependencyDashboardTitle": "🤖 Dependency Dashboard",
+
+  // === DEFAULT LABELS ===
+  "labels": ["dependencies"],
+
+  // === SECURITY UPDATES ===
+  // Security updates are special - no waiting, immediate action
+  "vulnerabilityAlerts": {
+    "labels": ["type:security"],
+    "minimumReleaseAge": null // Skip the 7-day wait for security fixes
+  },
+
   "packageRules": [
+    // === LANGUAGE-SPECIFIC LABELS ===
+    // Add language-specific labels for easy filtering
+    { "matchCategories": ["python"], "addLabels": ["python"] },
+    { "matchCategories": ["golang"], "addLabels": ["go"] },
+    { "matchCategories": ["docker"], "addLabels": ["docker"] },
+    { "matchCategories": ["github-actions"], "addLabels": ["github-actions"] },
+
+    // === DEV DEPENDENCIES ===
+    // Handle dev deps differently - they're lower risk and can update more frequently
+    {
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "schedule": ["at any time"], // More frequent updates for dev tools
+      "automerge": true,
+      "addLabels": ["dev-deps"]
+    },
+
+    // === MAJOR VERSION HANDLING ===
+    // Give major updates special treatment - they need human review
+    {
+      "matchUpdateTypes": ["major"],
+      "addLabels": ["major-update", "needs-review"],
+      "prPriority": 10, // Higher priority so they don't get buried
+      "minimumReleaseAge": "14 days", // Extra aging for major versions
+      "automerge": false // Never auto-merge major updates
+    },
+
+    // === SAFE UPDATES (AUTO-MERGE) ===
+    // Auto-merge safe updates (minor/patch/digests) - major versions need human review
+    {
+      "matchUpdateTypes": ["minor", "patch", "digest", "lockFileMaintenance"],
+      "automerge": true
+    },
+
+    // === GITHUB ACTIONS ===
+    // GitHub Actions are generally safe to auto-merge
     {
       "matchManagers": ["github-actions"],
-      "automerge": true,
-      "automergeType": "pr"
+      "automerge": true
+    },
+
+    // === LANGUAGE-SPECIFIC GROUPING ===
+    // Group Go updates together and auto-merge safe ones
+    {
+      "matchCategories": ["golang"],
+      "matchUpdateTypes": ["minor", "patch", "digest", "lockFileMaintenance"],
+      "groupName": "golang", // Single PR for all Go updates
+      "automerge": true
+    },
+
+    // Group Python updates together and auto-merge safe ones
+    {
+      "matchCategories": ["python"],
+      "matchUpdateTypes": ["minor", "patch", "digest", "lockFileMaintenance"],
+      "groupName": "python", // Single PR for all Python updates
+      "automerge": true
+    },
+
+    // Docker images: group updates, pin to digests for reproducibility
+    {
+      "matchCategories": ["docker"],
+      "matchUpdateTypes": ["minor", "patch", "digest", "lockFileMaintenance"],
+      "groupName": "docker", // Single PR for all Docker updates
+      "pinDigests": true, // Use SHA digests instead of tags for deterministic builds
+      "automerge": true
     }
   ]
 }
