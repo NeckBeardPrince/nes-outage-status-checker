@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://*.basemaps.cartocdn.com https://server.arcgisonline.com https://*.tile.openstreetmap.org; connect-src 'self' https://utilisocial.io https://nominatim.openstreetmap.org https://raw.githubusercontent.com; child-src blob:">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NES Outage Status Checker</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
@@ -1852,6 +1853,12 @@
     <script>
         const API_URL = 'https://utilisocial.io/datacapable/v2/p/NES/map/events';
         const STORAGE_KEY = 'nes-outage-monitors';
+
+        // Escape untrusted values (from the upstream API) before inserting into innerHTML
+        function esc(value) {
+            return String(value ?? '').replace(/[&<>"']/g, c =>
+                ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
         const SETTINGS_KEY = 'nes-outage-settings';
         let refreshTimer = null;
         let countdownTimer = null;
@@ -2435,7 +2442,7 @@
                         <div class="nearby-crew-status"></div>
                         <div class="nearby-crew-details">
                             <div class="nearby-crew-event">Event ${c.event.id}</div>
-                            <div class="nearby-crew-meta">${c.event.numPeople} customers &bull; ${c.event.status}</div>
+                            <div class="nearby-crew-meta">${c.event.numPeople} customers &bull; ${esc(c.event.status)}</div>
                         </div>
                         <div class="nearby-crew-distance">${distanceStr} mi</div>
                     </div>
@@ -2773,7 +2780,7 @@
                         <div class="result-details">
                             <div class="result-event">Event ${r.event.id}</div>
                             <div class="result-meta">${r.event.numPeople} customers · ${distanceStr} mi away</div>
-                            <div class="result-status ${statusClass}">${statusText}</div>
+                            <div class="result-status ${statusClass}">${esc(statusText)}</div>
                         </div>
                         <div class="result-confidence ${confidenceClasses[index]}">${confidenceLabels[index]}</div>
                     </div>
@@ -3285,7 +3292,7 @@
         }
 
         // Version check
-        const APP_VERSION = '1.11.0';
+        const APP_VERSION = '1.12.0';
         const SEEN_VERSION_KEY = 'nes-outage-seen-version';
 
         function parseChangelog(markdown, version) {
