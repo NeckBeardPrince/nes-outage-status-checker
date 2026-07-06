@@ -127,10 +127,54 @@ resource "aws_iam_role_policy" "lambda_s3" {
       {
         Effect = "Allow"
         Action = [
-          "s3:PutObject",
-          "s3:PutObjectAcl"
+          "s3:PutObject"
         ]
         Resource = "${aws_s3_bucket.archive.arn}/*"
+      }
+    ]
+  })
+}
+
+# -----------------------------------------------------------------------------
+# IAM Role for Health Check Lambda (logs only - no S3 access needed)
+# -----------------------------------------------------------------------------
+resource "aws_iam_role" "health_check" {
+  name = "nes-outage-health-check-lambda-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      }
+    ]
+  })
+
+  tags = {
+    Project   = "nes-outage-status-checker"
+    ManagedBy = "terraform"
+  }
+}
+
+resource "aws_iam_role_policy" "health_check_logs" {
+  name = "cloudwatch-logs"
+  role = aws_iam_role.health_check.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "arn:aws:logs:${var.aws_region}:${var.aws_account_id}:*"
       }
     ]
   })
@@ -231,7 +275,7 @@ resource "aws_lambda_function" "health_check" {
   timeout     = 15
   memory_size = 128
 
-  role = aws_iam_role.lambda.arn
+  role = aws_iam_role.health_check.arn
 
   tags = {
     Project   = "nes-outage-status-checker"

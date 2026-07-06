@@ -2,6 +2,20 @@
 
 All notable changes to the NES Outage Status Checker will be documented in this file.
 
+## [1.12.0] - 2026-07-06
+
+### Security
+
+#### Web App - Both Pages
+- **Output escaping** - API-supplied fields (title, cause, status) and geocoding results are now HTML-escaped before rendering, closing DOM-based XSS vectors if the upstream data source returns malicious content
+- **Content Security Policy** - Added a CSP to all pages that restricts script, style, image, font, and network origins to the specific hosts the app uses
+- **Subresource Integrity** - The Chart.js CDN script now carries an SRI hash so a tampered CDN artifact will not execute
+
+#### Infrastructure
+- **IAM least privilege** - The health check Lambda now uses its own logs-only role instead of sharing the archiver's S3-write role, and the archiver's unused `s3:PutObjectAcl` permission was removed
+
+---
+
 ## [1.11.0] - 2026-01-31
 
 *Thank you to [cgoliver](https://github.com/cgoliver) for [PR #9](https://github.com/NeckBeardPrince/nes-outage-status-checker/pull/9)!*

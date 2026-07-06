@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://*.basemaps.cartocdn.com https://server.arcgisonline.com https://*.tile.openstreetmap.org; connect-src 'self' https://utilisocial.io https://nominatim.openstreetmap.org https://raw.githubusercontent.com">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>All Outages - NES Outage Status Checker</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
@@ -10,7 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" integrity="sha384-e6nUZLBkQ86NJ6TVVKAeSaK8jWa3NhkYWZFomE39AvDbQWeie9PlQqM3pmYW5d1g" crossorigin="anonymous"></script>
     <style>
         :root {
             /* Typography */
@@ -1532,6 +1533,12 @@
     <script>
         const API_URL = 'https://utilisocial.io/datacapable/v2/p/NES/map/events';
         const SETTINGS_KEY = 'nes-outage-all-settings';
+
+        // Escape untrusted values (from the upstream API) before inserting into innerHTML
+        function esc(value) {
+            return String(value ?? '').replace(/[&<>"']/g, c =>
+                ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
         let refreshTimer = null;
         let countdownTimer = null;
         let nextRefreshTime = null;
@@ -1778,20 +1785,20 @@
             const hasCoords = event.latitude && event.longitude;
 
             return `
-                <div class="event-card ${statusClass} ${compactView ? 'compact' : ''}" data-id="${event.id}" data-status="${event.status}" data-lat="${event.latitude || ''}" data-lng="${event.longitude || ''}" data-numpeople="${event.numPeople}" data-cause="${event.cause || ''}" data-title="${event.title || 'Outage'}">
+                <div class="event-card ${statusClass} ${compactView ? 'compact' : ''}" data-id="${event.id}" data-status="${esc(event.status)}" data-lat="${event.latitude || ''}" data-lng="${event.longitude || ''}" data-numpeople="${event.numPeople}" data-cause="${esc(event.cause || '')}" data-title="${esc(event.title || 'Outage')}">
                     <div class="event-header">
                         <div>
-                            <div class="event-title">${event.title || 'Outage'}</div>
+                            <div class="event-title">${esc(event.title || 'Outage')}</div>
                             <div class="event-id">ID: ${event.id}</div>
                         </div>
-                        <span class="status-badge ${badgeClass}">${event.status.toUpperCase()}</span>
+                        <span class="status-badge ${badgeClass}">${esc(event.status.toUpperCase())}</span>
                     </div>
                     <div class="details-content">
                         <div class="field">
                             <span class="label">Affected:</span>
                             <span class="value">${event.numPeople} people</span>
                         </div>
-                        ${event.cause ? `<div class="field"><span class="label">Cause:</span><span class="value">${event.cause}</span></div>` : ''}
+                        ${event.cause ? `<div class="field"><span class="label">Cause:</span><span class="value">${esc(event.cause)}</span></div>` : ''}
                         <div class="field">
                             <span class="label">Started:</span>
                             <span class="value">${formatDate(event.startTime)}</span>
@@ -1903,8 +1910,8 @@
 
             content.innerHTML = changeHistory.map(h => {
                 const time = new Date(h.time).toLocaleTimeString();
-                return `<div class="history-item ${h.type}">
-                    <span>${h.message}</span>
+                return `<div class="history-item ${esc(h.type)}">
+                    <span>${esc(h.message)}</span>
                     <span class="history-time">${time}</span>
                 </div>`;
             }).join('');
@@ -2162,9 +2169,9 @@
             document.getElementById('locationModalTitle').textContent = title;
             document.getElementById('locationModalSubtitle').textContent = `Event ID: ${eventId}`;
             document.getElementById('locationModalInfo').innerHTML = `
-                <span><strong>Status:</strong> ${status}</span>
-                <span><strong>Affected:</strong> ${numPeople} people</span>
-                ${cause ? `<span><strong>Cause:</strong> ${cause}</span>` : ''}
+                <span><strong>Status:</strong> ${esc(status)}</span>
+                <span><strong>Affected:</strong> ${esc(numPeople)} people</span>
+                ${cause ? `<span><strong>Cause:</strong> ${esc(cause)}</span>` : ''}
                 <span><strong>Coords:</strong> ${lat.toFixed(4)}, ${lng.toFixed(4)}</span>
                 <span id="locationAddress"><strong>Location:</strong> <em>Looking up...</em></span>
             `;
@@ -2267,9 +2274,9 @@
                 else if (addr.town) parts.push(addr.town);
                 else if (addr.village) parts.push(addr.village);
 
-                const location = parts.length > 0 ? parts.join(', ') : (data.display_name || 'Unknown area');
+                const location = esc(parts.length > 0 ? parts.join(', ') : (data.display_name || 'Unknown area'));
 
-                // Cache the result
+                // Cache the result (already escaped for safe innerHTML insertion)
                 geocodeCache[cacheKey] = location;
 
                 addressEl.innerHTML = `<strong>Location:</strong> ${location}`;
@@ -2419,13 +2426,13 @@
                     const marker = L.marker([event.latitude, event.longitude], { icon })
                         .addTo(map)
                         .bindPopup(`
-                            <div class="popup-title">${event.title || 'Outage'}</div>
+                            <div class="popup-title">${esc(event.title || 'Outage')}</div>
                             <div class="popup-field"><strong>ID:</strong> ${event.id}</div>
                             <div class="popup-field"><strong>Affected:</strong> ${event.numPeople} people</div>
-                            ${event.cause ? `<div class="popup-field"><strong>Cause:</strong> ${event.cause}</div>` : ''}
+                            ${event.cause ? `<div class="popup-field"><strong>Cause:</strong> ${esc(event.cause)}</div>` : ''}
                             <div class="popup-field"><strong>Started:</strong> ${formatDate(event.startTime)}</div>
                             <div class="popup-field"><strong>Duration:</strong> ${formatDuration(event.startTime)}</div>
-                            <div class="popup-status ${isAssigned ? 'assigned' : 'unassigned'}">${event.status.toUpperCase()}</div>
+                            <div class="popup-status ${isAssigned ? 'assigned' : 'unassigned'}">${esc(event.status.toUpperCase())}</div>
                         `);
 
                     markers.push(marker);
@@ -2703,7 +2710,7 @@
         }
 
         // Version check
-        const APP_VERSION = '1.11.0';
+        const APP_VERSION = '1.12.0';
         const SEEN_VERSION_KEY = 'nes-outage-seen-version';
 
         function parseChangelog(markdown, version) {
