@@ -8,8 +8,6 @@
   // === ASSIGNMENT & REVIEW ===
   // Who gets assigned to dependency PRs
   "assignees": ["NeckBeardPrince"],
-  // Who reviews the PRs (copilot = GitHub Copilot review)
-  "reviewers": ["copilot"],
 
   // === SCHEDULING & TIMING ===
   // Use your actual timezone for better scheduling
@@ -51,6 +49,15 @@
   },
 
   "packageRules": [
+    // === SECURITY TOOLING (fast-track) ===
+    // harden-runner protects CI; keep it current with minimal delay
+    {
+      "matchDepNames": ["step-security/harden-runner"],
+      "minimumReleaseAge": "1 day",
+      "automerge": true,
+      "addLabels": ["security-tooling"]
+    },
+
     // === LANGUAGE-SPECIFIC LABELS ===
     // Add language-specific labels for easy filtering
     { "matchCategories": ["python"], "addLabels": ["python"] },
