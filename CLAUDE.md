@@ -5,8 +5,9 @@ A web app and CLI tool for monitoring Nashville Electric Service power outages.
 ## Project Structure
 
 - `docs/` - Static web app (GitHub Pages site), NOT documentation
-  - `index.html` - Monitor page (track specific outages by Event ID or address)
-  - `all.html` - Dashboard (view all active outages, map view)
+  - `index.html` - Dashboard / landing page (view all active outages, map view, chart view)
+  - `monitor.html` - Monitor page (track specific outages by Event ID or address)
+  - `all.html` - Redirect stub to `index.html`, kept for pre-1.13.0 bookmarks
   - `how-it-works.html` - Explainer page
   - `version.json` - App version for update detection
 - `cmd/` - Go CLI application (Bubble Tea TUI)

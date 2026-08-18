@@ -2,6 +2,22 @@
 
 All notable changes to the NES Outage Status Checker will be documented in this file.
 
+## [1.13.0] - 2026-08-18
+
+### Changed
+
+#### Web App - Navigation
+- **All Outages is now the landing page** - Visiting [nes-outage-checker.com](https://nes-outage-checker.com) goes straight to the full outage dashboard instead of the single-outage monitor
+- **Monitor page moved to `/monitor.html`** - Reachable from the Monitor link in the header on every page
+
+### Fixed
+
+#### Web App - Navigation
+- **Existing share links keep working** - Monitor links shared before this release (`/?monitors=...` and the older `/?events=...`) now forward to the monitor page with their tracked events intact
+- **Old dashboard bookmarks keep working** - `/all.html` redirects to the new landing page
+
+---
+
 ## [1.12.0] - 2026-07-06
 
 ### Security
