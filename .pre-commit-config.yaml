@@ -1,24 +1,67 @@
 repos:
-- repo: https://github.com/gitleaks/gitleaks
-  rev: v8.30.0
-  hooks:
-  - id: gitleaks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      # Git style
+      - id: check-merge-conflict
+      - id: check-vcs-permalinks
+      - id: forbid-new-submodules
 
-- repo: https://github.com/jumanjihouse/pre-commit-hooks
-  rev: 3.0.0
-  hooks:
-  - id: shellcheck
+      # Common errors
+      - id: check-executables-have-shebangs
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+        exclude: CHANGELOG.md
+      - id: check-yaml
+        args: [--allow-multiple-documents]
 
-- repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: v6.0.0
-  hooks:
-  - id: end-of-file-fixer
-  - id: trailing-whitespace
-- repo: https://github.com/golangci/golangci-lint
-  rev: v1.52.2
-  hooks:
-  - id: golangci-lint
-- repo: https://github.com/pylint-dev/pylint
-  rev: v2.17.2
-  hooks:
-  - id: pylint
+        # Basic security
+      - id: detect-private-key
+
+      # Cross platform
+      - id: end-of-file-fixer
+      - id: check-case-conflict
+      - id: mixed-line-ending
+        args: [--fix=lf]
+
+  # Commit message format (conventional commits)
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v4.4.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+
+  # GGShield and Gitleaks for secret scanning
+  - repo: https://github.com/gitguardian/ggshield
+    rev: v1.54.0
+    hooks:
+      - id: ggshield
+        language_version: python3
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.0
+    hooks:
+      - id: gitleaks
+
+  # Shell formatting
+  - repo: https://github.com/jumanjihouse/pre-commit-hooks
+    rev: 3.0.0
+    hooks:
+      - id: shellcheck
+
+  # Go formatting
+  - repo: https://github.com/dnephin/pre-commit-golang
+    rev: v0.5.1
+    hooks:
+      - id: go-fmt
+
+  - repo: https://github.com/golangci/golangci-lint
+    rev: v2.13.2
+    hooks:
+      - id: golangci-lint
+
+  # Python formatting
+  - repo: https://github.com/pylint-dev/pylint
+    rev: v4.0.8
+    hooks:
+      - id: pylint
