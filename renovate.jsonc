@@ -93,36 +93,35 @@
     },
 
     // === GITHUB ACTIONS ===
-    // GitHub Actions are generally safe to auto-merge
+    // GitHub Actions are generally safe to auto-merge (majors still need review,
+    // per MAJOR VERSION HANDLING above - this rule must not override that)
     {
       "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["minor", "patch", "digest", "lockFileMaintenance"],
       "automerge": true
     },
 
     // === LANGUAGE-SPECIFIC GROUPING ===
-    // Group Go updates together and auto-merge safe ones
+    // Group Go updates together (auto-merge for these update types already set by SAFE UPDATES above)
     {
       "matchCategories": ["golang"],
       "matchUpdateTypes": ["minor", "patch", "digest", "lockFileMaintenance"],
-      "groupName": "golang", // Single PR for all Go updates
-      "automerge": true
+      "groupName": "golang" // Single PR for all Go updates
     },
 
-    // Group Python updates together and auto-merge safe ones
+    // Group Python updates together (auto-merge for these update types already set by SAFE UPDATES above)
     {
       "matchCategories": ["python"],
       "matchUpdateTypes": ["minor", "patch", "digest", "lockFileMaintenance"],
-      "groupName": "python", // Single PR for all Python updates
-      "automerge": true
+      "groupName": "python" // Single PR for all Python updates
     },
 
-    // Docker images: group updates, pin to digests for reproducibility
+    // Docker images: group updates (auto-merge already set by SAFE UPDATES above;
+    // digest pinning already global via config:best-practices -> docker:pinDigests)
     {
       "matchCategories": ["docker"],
       "matchUpdateTypes": ["minor", "patch", "digest", "lockFileMaintenance"],
-      "groupName": "docker", // Single PR for all Docker updates
-      "pinDigests": true, // Use SHA digests instead of tags for deterministic builds
-      "automerge": true
+      "groupName": "docker" // Single PR for all Docker updates
     }
   ]
 }
