@@ -1633,13 +1633,13 @@
                 const savedMapStyle = localStorage.getItem('nes-map-style');
                 if (savedMapStyle && tileLayers[savedMapStyle]) mapStyle = savedMapStyle;
                 updateSettingsUI();
-                
+
                 // Restore chart metric selector
                 const metricSelect = document.getElementById('chartMetricSelect');
                 if (metricSelect) {
                     metricSelect.value = chartMetric;
                 }
-                
+
                 // Restore chart view if it was visible
                 if (chartVisible) {
                     setTimeout(() => setView('chart'), 100);
@@ -2041,7 +2041,7 @@
                 // Store all events for map (before any filtering)
                 allEventsForMap = [...events];
                 sortAndFilter();
-                
+
                 // Calculate totals and crew metrics, store for chart
                 const totalAffected = events.reduce((sum, e) => sum + (e.numPeople || 0), 0);
                 const totalOutages = events.length;
@@ -2051,12 +2051,12 @@
                 const waitingForCrew = unassignedEvents.length;
                 const customersBeingRestored = assignedEvents.reduce((sum, e) => sum + (e.numPeople || 0), 0);
                 storeChartData(totalAffected, totalOutages, activeCrews, customersBeingRestored, waitingForCrew);
-                
+
                 // Update chart if visible
                 if (chartVisible && affectedCustomersChart) {
                     renderChart();
                 }
-                
+
                 loadingEl.classList.add('hidden');
                 document.getElementById('lastChecked').textContent = new Date().toLocaleTimeString();
 
@@ -2526,7 +2526,7 @@
         function storeChartData(totalAffected, totalOutages, activeCrews, customersBeingRestored, waitingForCrew) {
             const now = new Date();
             const interval = roundTo10Minutes(now);
-            
+
             // Get existing data
             let chartData = [];
             try {
@@ -2602,13 +2602,13 @@
             if (!canvas || !chartContainer) return;
 
             const chartData = getChartData();
-            
+
             // Destroy existing chart if it exists
             if (affectedCustomersChart) {
                 affectedCustomersChart.destroy();
                 affectedCustomersChart = null;
             }
-            
+
             if (chartData.length < 2) {
                 // Show message but keep canvas structure
                 const existingMsg = chartContainer.querySelector('.chart-empty-msg');

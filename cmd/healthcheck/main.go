@@ -31,11 +31,11 @@ type OutageEvent struct {
 
 // HealthResponse represents the JSON response from the health endpoint
 type HealthResponse struct {
-	Status     string   `json:"status"`
-	Message    string   `json:"message,omitempty"`
-	EventCount int      `json:"event_count,omitempty"`
-	Checks     []Check  `json:"checks"`
-	Timestamp  string   `json:"timestamp"`
+	Status     string  `json:"status"`
+	Message    string  `json:"message,omitempty"`
+	EventCount int     `json:"event_count,omitempty"`
+	Checks     []Check `json:"checks"`
+	Timestamp  string  `json:"timestamp"`
 }
 
 // Check represents an individual health check result
