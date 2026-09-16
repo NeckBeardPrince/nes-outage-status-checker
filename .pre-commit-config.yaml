@@ -59,9 +59,3 @@ repos:
     rev: v2.13.2
     hooks:
       - id: golangci-lint
-
-  # Python formatting
-  - repo: https://github.com/pylint-dev/pylint
-    rev: v4.0.8
-    hooks:
-      - id: pylint
