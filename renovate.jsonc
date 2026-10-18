@@ -97,7 +97,9 @@
     // per MAJOR VERSION HANDLING above - this rule must not override that)
     {
       "matchManagers": ["github-actions"],
-      "matchUpdateTypes": ["minor", "patch", "digest", "lockFileMaintenance"],
+      "matchPackageNames": ["!step-security/harden-runner"],
+      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "groupName": "github actions",
       "automerge": true
     },
 
