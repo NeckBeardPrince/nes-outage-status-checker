@@ -1,0 +1,5 @@
+secret:
+  ignored_matches:
+  - match: 07bbe166357dcce6138a2f83971e501d7dcfd431feeb89ef3e4e5b3bc80eccab
+    name: CARTO Basemaps API Key - commit://staged/docs/index.html
+version: 2

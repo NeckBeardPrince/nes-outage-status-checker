@@ -1578,8 +1578,8 @@
         // Map tile providers: CartoDB for dark/light themes, ESRI for aerial/satellite
         // subdomains 'abcd' enables parallel tile loading from CDN (not used by ESRI)
         const tileLayers = {
-            dark: { url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', subdomains: 'abcd' },
-            light: { url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', subdomains: 'abcd' },
+            dark: { url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?key=cb1_4zzr_1_e189391fc770850986ef3490', subdomains: 'abcd' },
+            light: { url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png?key=cb1_4zzr_1_e189391fc770850986ef3490', subdomains: 'abcd' },
             aerial: { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', subdomains: null }
         };
 
@@ -2722,7 +2722,7 @@
         }
 
         // Version check
-        const APP_VERSION = '1.13.0';
+        const APP_VERSION = '1.13.1';
         const SEEN_VERSION_KEY = 'nes-outage-seen-version';
 
         function parseChangelog(markdown, version) {

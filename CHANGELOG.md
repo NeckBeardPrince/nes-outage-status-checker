@@ -2,6 +2,15 @@
 
 All notable changes to the NES Outage Status Checker will be documented in this file.
 
+## [1.13.1] - 2026-11-01
+
+### Fixed
+
+#### Web App - Maps
+- **Dark and light map tiles load again** - CARTO now requires an API key for its map tiles, so maps showed an "API KEY REQUIRED" watermark instead of streets. Tile requests now include a key
+
+---
+
 ## [1.13.0] - 2026-08-18
 
 ### Changed
