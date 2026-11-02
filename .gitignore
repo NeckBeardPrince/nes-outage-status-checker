@@ -33,5 +33,5 @@ go.work.sum
 # .vscode/
 scripts/watch-outage.sh
 
-# graft's local graph cache — regenerable, not committed (run `graft build`).
-/graft/
+# Added by ggshield
+.cache_ggshield
