@@ -35,8 +35,10 @@
 
   // === DEPENDENCY DASHBOARD ===
   // Get a nice overview issue with all pending updates
-  "dependencyDashboard": true,
-  "dependencyDashboardTitle": "🤖 Dependency Dashboard",
+  "dependencyDashboard": {
+    "enabled": true,
+    "title": "🤖 Dependency Dashboard"
+  },
 
   // === DEFAULT LABELS ===
   "labels": ["dependencies"],
