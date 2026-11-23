@@ -2,6 +2,24 @@
 
 All notable changes to the NES Outage Status Checker will be documented in this file.
 
+## [1.14.0] - 2026-11-23
+
+### Changed
+
+#### Web App - Design
+- **A fresh coat of paint** - New "Porch Light" look across every page: a night-sky palette with a warm porch-light accent, plus a cozy cream light mode
+- **New fonts** - Bricolage Grotesque for headings and Atkinson Hyperlegible Next for body text, picked for readability
+- **Status at a glance** - The dashboard and monitor pages open with a plain-English summary, like "Right now 1,204 neighbors are in the dark across 37 outages," above larger stat cards
+- **Tidier toolbar** - Filters, sort, and auto-refresh live in one "Filters & sort" menu on the dashboard. On the monitor page, Sort, Export, Import, and Clear live under "Manage"
+- **Clearer status colors** - Coral means waiting for a crew and mint means a crew is working
+
+### Added
+
+#### Web App - Fun
+- **A few surprises** - Some things around the site are worth poking at. Curious developers should open the browser console
+
+---
+
 ## [1.13.1] - 2026-11-01
 
 ### Fixed

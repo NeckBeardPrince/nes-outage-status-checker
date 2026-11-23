@@ -1,0 +1,9 @@
+[tasks.serve]
+description = "Serve the web app from docs/ at http://localhost:<port>"
+usage = 'flag "-p --port <port>" help="Port to listen on" default="8000"'
+run = 'echo "Serving docs/ at http://localhost:${usage_port?}" && python3 -m http.server "${usage_port?}" --bind 127.0.0.1 --directory docs'
+
+[tasks.dev]
+description = "Serve docs/ and open the dashboard in your browser"
+usage = 'flag "-p --port <port>" help="Port to listen on" default="8000"'
+run = '(sleep 1 && open "http://localhost:${usage_port?}/") & python3 -m http.server "${usage_port?}" --bind 127.0.0.1 --directory docs'
