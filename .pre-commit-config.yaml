@@ -26,14 +26,14 @@ repos:
 
   # Commit message format (conventional commits)
   - repo: https://github.com/compilerla/conventional-pre-commit
-    rev: v4.4.0
+    rev: v4.5.0
     hooks:
       - id: conventional-pre-commit
         stages: [commit-msg]
 
   # GGShield and Gitleaks for secret scanning
   - repo: https://github.com/gitguardian/ggshield
-    rev: v1.54.0
+    rev: v1.56.1
     hooks:
       - id: ggshield
         language_version: python3
@@ -56,6 +56,6 @@ repos:
       - id: go-fmt
 
   - repo: https://github.com/golangci/golangci-lint
-    rev: v2.13.2
+    rev: v2.15.0
     hooks:
       - id: golangci-lint
