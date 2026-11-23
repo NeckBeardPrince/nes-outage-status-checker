@@ -9,7 +9,12 @@ A web app and CLI tool for monitoring Nashville Electric Service power outages.
   - `monitor.html` - Monitor page (track specific outages by Event ID or address)
   - `all.html` - Redirect stub to `index.html`, kept for pre-1.13.0 bookmarks
   - `how-it-works.html` - Explainer page
+  - `styles.css` - Shared "Porch Light" theme: tokens, page shell, shared components. Linked after each page's inline `<style>` so it wins; page-specific rules stay inline
+  - `ui.js` - Shared UI helpers (status sentence built from the stat elements, popover close behavior, `porchToast`)
+  - `eggs.js` - Easter eggs (keep them undocumented in user-facing copy)
   - `version.json` - App version for update detection
+- `design/` - Design specs and implementation plans (not published)
+- `mise.toml` - `mise run dev` serves `docs/` locally and opens the browser; `mise run serve` just serves
 - `cmd/` - Go CLI application (Bubble Tea TUI)
 - `terraform/` - AWS infrastructure (Lambda, S3, EventBridge, API Gateway)
 - `lambda/` - Python Lambda functions
@@ -26,10 +31,10 @@ A web app and CLI tool for monitoring Nashville Electric Service power outages.
 
 ## Key Conventions
 
-- Dark theme default, light mode toggle
-- All user preferences stored in localStorage
+- Dark theme default, light mode toggle. Colors and fonts come from CSS variables in `docs/styles.css`; don't hardcode palette hex values in pages
+- All user preferences stored in `localStorage`
 - Version bumps require updating both `docs/version.json` and `CHANGELOG.md`
-- Nominatim (OpenStreetMap) used for geocoding - respect 1 req/sec rate limit
+- `Nominatim` (OpenStreetMap) used for address lookups - respect 1 req/sec rate limit
 
 ## Deployment
 
